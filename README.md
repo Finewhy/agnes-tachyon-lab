@@ -43,4 +43,4 @@ Since this project is built using web standards (**HTML5 & JavaScript modules** 
 
 1. **Clone repository ini:**
    ```bash
-   git clone [https://github.com/username/agnes-tachyon-lab.git](https://github.com/username/agnes-tachyon-lab.git)
+   git clone [https://github.com/finewhy/agnes-tachyon-lab.git](https://github.com/finewhy/agnes-tachyon-lab.git)
