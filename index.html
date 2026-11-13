@@ -137,7 +137,7 @@
     <div id="canvas-container"></div>
 
     <!-- Layer Titik Info 3D -->
-    <div id="markers-layer"></div>
+    <div id="markers-layer" style="display:none"></div>
 
     <!-- Tooltip Hover -->
     <div id="hover-tooltip" class="bg-slate-900/90 text-teal-100 border border-teal-400/40 px-3.5 py-1.5 rounded-xl shadow-xl backdrop-blur-md text-xs font-medium flex items-center gap-2 whitespace-nowrap">
@@ -146,7 +146,7 @@
     </div>
 
     <!-- Header & Kontrol Atas -->
-    <header class="fixed top-0 left-0 w-full z-20 pointer-events-none px-4 pt-4 sm:px-6 sm:pt-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <header id="lab-header" style="display:none" class="fixed top-0 left-0 w-full z-20 pointer-events-none px-4 pt-4 sm:px-6 sm:pt-5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <!-- Judul Karakter -->
         <div class="pointer-events-auto bg-slate-900/75 border border-teal-500/30 backdrop-blur-xl px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center text-slate-950 font-display font-bold text-lg shadow-inner">
@@ -169,6 +169,9 @@
 
         <!-- Tombol Kontrol Navigasi -->
         <div class="pointer-events-auto flex items-center gap-2">
+            <button id="back-home-btn" class="bg-slate-900/75 hover:bg-slate-800/90 active:scale-95 text-teal-200 border border-teal-500/30 backdrop-blur-xl px-3.5 py-2 rounded-xl text-xs font-medium shadow-lg transition-all flex items-center gap-1.5 cursor-pointer">
+                <span>←</span><span>Home</span>
+            </button>
             <button id="toggle-pins-btn" class="bg-slate-900/75 hover:bg-slate-800/90 active:scale-95 text-teal-200 border border-teal-500/30 backdrop-blur-xl px-3.5 py-2 rounded-xl text-xs font-medium shadow-lg transition-all flex items-center gap-2 cursor-pointer">
                 <span id="pin-status-dot" class="w-2 h-2 rounded-full bg-teal-400"></span>
                 <span>Titik Info</span>
@@ -232,9 +235,48 @@
         </div>
     </section>
 
+    <!-- ===== OVERLAY STAGE HOME ===== -->
+    <div id="stage-fade" class="fixed inset-0 z-[60] bg-[#020b10] pointer-events-none opacity-0 transition-opacity duration-500"></div>
+    <div id="home-ui" class="fixed inset-0 z-20 pointer-events-none">
+        <div class="absolute top-4 left-4 sm:top-6 sm:left-6 bg-slate-900/70 border border-teal-500/30 backdrop-blur-xl px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center text-slate-950 font-display font-bold text-lg">⚛</div>
+            <div>
+                <div class="font-display text-sm sm:text-base font-bold tracking-wider text-white">AGNES TACHYON</div>
+                <div class="text-[11px] text-teal-300/80">Tracen Academy · Home</div>
+            </div>
+        </div>
+        <div class="absolute top-6 right-6 text-[11px] text-slate-300/80 hidden sm:block bg-slate-900/50 border border-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl">
+            Tap karakter · geser untuk memutar · scroll untuk zoom
+        </div>
+
+        <div class="absolute bottom-5 left-0 w-full px-4 flex flex-col items-center gap-3">
+            <div class="w-full max-w-xl bg-slate-900/80 border border-teal-400/35 backdrop-blur-xl rounded-2xl px-5 py-3.5 shadow-2xl">
+                <div class="text-[10px] font-bold uppercase tracking-widest text-teal-300 mb-1">Agnes Tachyon</div>
+                <p id="home-dialog-text" class="text-sm text-slate-100 leading-relaxed min-h-[2.75rem]"></p>
+            </div>
+            <button id="enter-lab-btn" class="pointer-events-auto bg-teal-600/90 hover:bg-teal-500 active:scale-95 text-white border border-teal-300/40 backdrop-blur-xl px-6 py-2.5 rounded-2xl text-sm font-semibold shadow-lg transition-all cursor-pointer flex items-center gap-2">
+                <span>Masuk Tachyon Lab</span><span>→</span>
+            </button>
+        </div>
+
+        <div id="home-loading" class="absolute inset-0 flex items-center justify-center">
+            <div class="bg-slate-900/80 border border-teal-400/30 backdrop-blur-xl rounded-2xl px-5 py-3 text-sm text-teal-100 flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse"></span>
+                <span>Memuat model Tachyon… <span id="home-progress">0%</span></span>
+            </div>
+        </div>
+        <div id="home-error" class="absolute inset-x-0 top-24 px-4 flex justify-center" style="display:none">
+            <div class="max-w-md bg-slate-900/90 border border-amber-400/40 backdrop-blur-xl rounded-2xl px-5 py-4 text-xs text-amber-100 leading-relaxed">
+                <div class="font-semibold text-amber-300 mb-1">Model tachyon.glb gagal dimuat</div>
+                Pastikan file ada di <code class="text-white">models/tachyon.glb</code> (sejajar dengan index.html) dan halaman dibuka lewat server (Live Server, <code class="text-white">npx serve</code>, atau GitHub Pages), bukan klik dua kali (file://). Tombol lab tetap bisa dipakai.
+            </div>
+        </div>
+    </div>
+
     <!-- Three.js & OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
     <script>
         // ============================================================================
@@ -1665,6 +1707,7 @@
 
         // Event Pointer Move untuk Hover Glow & Tooltip
         renderer.domElement.addEventListener('pointermove', (e) => {
+            if (stage !== 'lab') return;
             const rect = renderer.domElement.getBoundingClientRect();
             pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1695,12 +1738,14 @@
         });
 
         renderer.domElement.addEventListener('pointerdown', (e) => {
+            if (stage !== 'lab') return;
             pointerDownPos = { x: e.clientX, y: e.clientY };
             // Hentikan animasi otomatis saat pengguna mulai menggeser kamera manual
             isCameraAnimating = false;
         });
 
         renderer.domElement.addEventListener('pointerup', (e) => {
+            if (stage !== 'lab') return;
             const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
             // Anggap sebagai klik murni jika pergeseran kursor < 6px
             if (dist < 6 && hoveredGroup) {
@@ -1724,6 +1769,7 @@
         });
 
         resetCamBtn.addEventListener('click', resetCameraView);
+        document.getElementById('back-home-btn').addEventListener('click', () => goStage('home'));
 
         togglePinsBtn.addEventListener('click', () => {
             pinsVisible = !pinsVisible;
@@ -1732,6 +1778,304 @@
                 : 'w-2 h-2 rounded-full bg-slate-500';
             markersLayer.style.display = pinsVisible ? 'block' : 'none';
         });
+
+        // ============================================================================
+        // 9B. STAGE HOME: MODEL 3D AGNES TACHYON (GLB) ALA HOME UMA MUSUME
+        // ============================================================================
+        const MODEL_URL = 'models/tachyon.glb';
+        let stage = 'home';
+        renderer.outputEncoding = THREE.sRGBEncoding; // warna GLB benar; dikembalikan saat masuk Lab
+
+        const homeScene = new THREE.Scene();
+        const homeCamera = new THREE.PerspectiveCamera(28, window.innerWidth / window.innerHeight, 0.1, 100);
+        const HOME_CAM_Y = 1.15, HOME_LOOK_Y = 0.95;
+        let homeZoom = 5.4, homeZoomTarget = 5.4;
+
+        homeScene.add(new THREE.HemisphereLight(0xdff9fb, 0x0b3948, 0.95));
+        const homeKey = new THREE.DirectionalLight(0xfffaf0, 1.7);
+        homeKey.position.set(2.5, 4, 4);
+        homeScene.add(homeKey);
+        const homeRim = new THREE.DirectionalLight(0x5eead4, 1.5);
+        homeRim.position.set(-3, 3, -3);
+        homeScene.add(homeRim);
+        const homeGlow = new THREE.PointLight(0x76ff03, 0.6, 6);
+        homeGlow.position.set(1.4, 0.6, 1.6);
+        homeScene.add(homeGlow);
+
+        function radialTexture(stops) {
+            const c = document.createElement('canvas');
+            c.width = c.height = 256;
+            const x = c.getContext('2d');
+            const g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+            stops.forEach(([o, col]) => g.addColorStop(o, col));
+            x.fillStyle = g;
+            x.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(c);
+        }
+
+        // Panggung: bayangan lembut, pendar lantai & cincin orbit
+        const stageFloor = new THREE.Group();
+        stageFloor.position.y = 0.005;
+        homeScene.add(stageFloor);
+        const blobShadow = new THREE.Mesh(
+            new THREE.CircleGeometry(0.75, 40),
+            new THREE.MeshBasicMaterial({ map: radialTexture([[0, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]), transparent: true, depthWrite: false })
+        );
+        blobShadow.rotation.x = -Math.PI / 2;
+        stageFloor.add(blobShadow);
+        const floorGlow = new THREE.Mesh(
+            new THREE.CircleGeometry(2.1, 48),
+            new THREE.MeshBasicMaterial({ map: radialTexture([[0, 'rgba(45,212,191,0.5)'], [0.6, 'rgba(20,184,166,0.15)'], [1, 'rgba(6,28,36,0)']]), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+        );
+        floorGlow.rotation.x = -Math.PI / 2;
+        floorGlow.position.y = 0.002;
+        stageFloor.add(floorGlow);
+        const ringA = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.02, 80), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
+        const ringB = new THREE.Mesh(new THREE.RingGeometry(1.32, 1.34, 96, 1, 0, Math.PI * 1.5), new THREE.MeshBasicMaterial({ color: 0x99f6e4, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+        [ringA, ringB].forEach(r => { r.rotation.x = -Math.PI / 2; r.position.y = 0.004; stageFloor.add(r); });
+
+        // Partikel melayang
+        const MOTE_N = 90;
+        const motePos = new Float32Array(MOTE_N * 3);
+        const moteSpd = new Float32Array(MOTE_N);
+        for (let i = 0; i < MOTE_N; i++) {
+            const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.6;
+            motePos.set([Math.cos(a) * r, Math.random() * 2.6, Math.sin(a) * r - 0.3], i * 3);
+            moteSpd[i] = 0.08 + Math.random() * 0.18;
+        }
+        const moteGeo = new THREE.BufferGeometry();
+        moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+        homeScene.add(new THREE.Points(moteGeo, new THREE.PointsMaterial({
+            size: 0.07, map: radialTexture([[0, 'rgba(204,251,241,1)'], [1, 'rgba(204,251,241,0)']]),
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        })));
+
+        // ---- Dialog Tachyon (efek ketik) ----
+        const HOME_LINES = {
+            greet: ['Oh, kau sudah datang, Guinea Pig-kun. Eksperimen hari ini baru akan dimulai.'],
+            idle: [
+                'Fufu… jangan diam saja. Data tidak akan mengumpulkan dirinya sendiri.',
+                'Hmm, kecepatan cahaya masih terlalu lambat untukku. Sedikit lagi.',
+                'Kau mau mencoba ramuan terbaruku? Tenang, efek sampingnya hampir tidak ada.'
+            ],
+            head: [
+                'Eh… kepalaku bukan objek uji. Tapi, hmm, tidak buruk juga. Catat itu.',
+                'Fufu, reaksimu menarik. Teruskan, anggap ini bagian dari penelitian.'
+            ],
+            body: [
+                'Hmm? Detak jantungmu naik. Menarik sekali. Tolong diam sebentar.',
+                'Kau sengaja menyentuh subjek penelitian tanpa izin, ya? Sungguh berani.'
+            ],
+            legs: [
+                'Hati-hati dengan kakiku! Itu aset penelitian paling berharga.',
+                'Kaki ini akan menembus batas kecepatan. Jangan dibuat lecet.'
+            ]
+        };
+        const dialogEl = document.getElementById('home-dialog-text');
+        let typeTimer = null, lastSayAt = 0;
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        function say(text) {
+            clearInterval(typeTimer);
+            dialogEl.textContent = '';
+            let i = 0;
+            typeTimer = setInterval(() => {
+                dialogEl.textContent = text.slice(0, ++i);
+                if (i >= text.length) clearInterval(typeTimer);
+            }, 24);
+            lastSayAt = performance.now() / 1000;
+        }
+
+        // ---- Muat model GLB ----
+        const homeRoot = new THREE.Group();
+        homeScene.add(homeRoot);
+        let homeModel = null, homeMixer = null, idleAction = null, reactActions = [];
+        const homeBox = new THREE.Box3();
+        const loadingEl = document.getElementById('home-loading');
+        const progressEl = document.getElementById('home-progress');
+
+        new THREE.GLTFLoader().load(
+            MODEL_URL,
+            (gltf) => {
+                homeModel = gltf.scene;
+                homeModel.traverse(o => {
+                    if (o.isMesh) {
+                        o.frustumCulled = false; // aman untuk SkinnedMesh
+                        const mats = Array.isArray(o.material) ? o.material : [o.material];
+                        mats.forEach(m => { if (m.map) m.map.anisotropy = 8; });
+                    }
+                });
+                // Normalisasi: tinggi 1.75 unit, pusat di X/Z = 0, kaki menapak di Y = 0
+                let box = new THREE.Box3().setFromObject(homeModel);
+                const size = box.getSize(new THREE.Vector3());
+                homeModel.scale.multiplyScalar(1.75 / (size.y || 1));
+                box = new THREE.Box3().setFromObject(homeModel);
+                const ctr = box.getCenter(new THREE.Vector3());
+                homeModel.position.set(-ctr.x, -box.min.y, -ctr.z);
+                homeRoot.add(homeModel);
+
+                // Animasi bawaan GLB (jika ada): idle berulang + reaksi saat disentuh
+                if (gltf.animations && gltf.animations.length) {
+                    homeMixer = new THREE.AnimationMixer(homeModel);
+                    const clips = gltf.animations;
+                    const idleClip = clips.find(c => /idle|stand|wait|breath/i.test(c.name)) || clips[0];
+                    idleAction = homeMixer.clipAction(idleClip);
+                    idleAction.play();
+                    reactActions = clips.filter(c => c !== idleClip).map(c => homeMixer.clipAction(c));
+                    homeMixer.addEventListener('finished', (e) => {
+                        if (!idleAction) return;
+                        idleAction.reset().fadeIn(0.3).play();
+                        e.action.fadeOut(0.3);
+                    });
+                }
+                loadingEl.style.display = 'none';
+                say(pick(HOME_LINES.greet));
+            },
+            (xhr) => { if (xhr.total) progressEl.textContent = Math.round(xhr.loaded / xhr.total * 100) + '%'; },
+            (err) => {
+                console.error('Gagal memuat ' + MODEL_URL, err);
+                loadingEl.style.display = 'none';
+                document.getElementById('home-error').style.display = 'flex';
+                say('Hmm, modelku belum ditemukan. Sementara itu, mari langsung ke laboratorium.');
+            }
+        );
+
+        // ---- Interaksi: tap (reaksi per area tubuh), geser (putar), scroll (zoom) ----
+        const hRay = new THREE.Raycaster();
+        const hPtr = new THREE.Vector2();
+        const hLook = { x: 0, y: 0, tx: 0, ty: 0 };
+        let hDrag = null, hYaw = 0, hYawTarget = 0, hLastTouch = 0, hopT = 0;
+
+        function homeTap(e) {
+            if (!homeModel) return;
+            const r = renderer.domElement.getBoundingClientRect();
+            hPtr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+            hRay.setFromCamera(hPtr, homeCamera);
+            homeBox.setFromObject(homeRoot).expandByScalar(0.05);
+            const hit = hRay.ray.intersectBox(homeBox, new THREE.Vector3());
+            if (!hit) return;
+            const ratio = (hit.y - homeBox.min.y) / (homeBox.max.y - homeBox.min.y);
+            const region = ratio > 0.76 ? 'head' : ratio > 0.4 ? 'body' : 'legs';
+            say(pick(HOME_LINES[region]));
+            hopT = 0.45;
+            if (reactActions.length) {
+                const a = pick(reactActions);
+                a.reset().setLoop(THREE.LoopOnce, 1);
+                a.clampWhenFinished = true;
+                a.fadeIn(0.2).play();
+                if (idleAction) idleAction.fadeOut(0.2);
+            }
+        }
+
+        const dom = renderer.domElement;
+        dom.addEventListener('pointerdown', (e) => {
+            if (stage !== 'home') return;
+            hDrag = { x: e.clientX, yaw: hYawTarget, moved: false };
+        });
+        dom.addEventListener('pointermove', (e) => {
+            if (stage !== 'home') return;
+            hLook.tx = (e.clientX / window.innerWidth) * 2 - 1;
+            hLook.ty = -((e.clientY / window.innerHeight) * 2 - 1);
+            if (!hDrag) return;
+            const dx = e.clientX - hDrag.x;
+            if (Math.abs(dx) > 6) hDrag.moved = true;
+            if (hDrag.moved) hYawTarget = THREE.MathUtils.clamp(hDrag.yaw + dx * 0.009, -1.8, 1.8);
+        });
+        const endDrag = (e) => {
+            if (stage !== 'home' || !hDrag) return;
+            if (!hDrag.moved && e.type === 'pointerup') homeTap(e);
+            hDrag = null;
+            hLastTouch = performance.now() / 1000;
+        };
+        dom.addEventListener('pointerup', endDrag);
+        dom.addEventListener('pointercancel', endDrag);
+        dom.addEventListener('wheel', (e) => {
+            if (stage !== 'home') return;
+            homeZoomTarget = THREE.MathUtils.clamp(homeZoomTarget + e.deltaY * 0.004, 3.4, 7);
+        }, { passive: true });
+        window.addEventListener('resize', () => {
+            homeCamera.aspect = window.innerWidth / window.innerHeight;
+            homeCamera.updateProjectionMatrix();
+        });
+
+        const homeClock = new THREE.Clock();
+        function updateHome(elapsed) {
+            const dt = Math.min(homeClock.getDelta(), 0.05);
+            if (homeMixer) homeMixer.update(dt);
+
+            // Badan menoleh halus mengikuti kursor; kembali menghadap depan bila dilepas
+            hLook.x += (hLook.tx - hLook.x) * 0.06;
+            hLook.y += (hLook.ty - hLook.y) * 0.06;
+            if (!hDrag && elapsed - hLastTouch > 2.5) hYawTarget *= 0.97;
+            hYaw += (hYawTarget - hYaw) * 0.12;
+            homeRoot.rotation.y = hYaw + hLook.x * 0.22;
+
+            // Napas halus (jika GLB tanpa animasi) & lompat kecil saat disentuh
+            homeRoot.scale.y = homeMixer ? 1 : 1 + Math.sin(elapsed * 1.8) * 0.006;
+            if (hopT > 0) { hopT -= dt; homeRoot.position.y = Math.sin((1 - Math.max(hopT, 0) / 0.45) * Math.PI) * 0.1; }
+            else homeRoot.position.y = 0;
+
+            // Kamera: parallax + zoom halus
+            homeZoom += (homeZoomTarget - homeZoom) * 0.1;
+            const portraitBoost = window.innerWidth / window.innerHeight < 0.8 ? 1.4 : 1;
+            homeCamera.position.set(hLook.x * 0.3, HOME_CAM_Y + hLook.y * 0.12, homeZoom * portraitBoost);
+            homeCamera.lookAt(0, HOME_LOOK_Y, 0);
+
+            ringA.rotation.z = elapsed * 0.35;
+            ringB.rotation.z = -elapsed * 0.22;
+            const p = moteGeo.attributes.position;
+            for (let i = 0; i < MOTE_N; i++) {
+                let y = p.getY(i) + moteSpd[i] * dt;
+                if (y > 2.8) y = 0;
+                p.setY(i, y);
+            }
+            p.needsUpdate = true;
+
+            if (homeModel && elapsed - lastSayAt > 18 && !hDrag) say(pick(HOME_LINES.idle));
+        }
+
+        // ---- Transisi Home <-> Lab ----
+        const stageFade = document.getElementById('stage-fade');
+        const homeUI = document.getElementById('home-ui');
+        const labHeader = document.getElementById('lab-header');
+        let switching = false;
+
+        function goStage(next) {
+            if (switching || stage === next) return;
+            switching = true;
+            stageFade.style.opacity = 1;
+            setTimeout(() => {
+                stage = next;
+                if (next === 'lab') {
+                    renderer.outputEncoding = THREE.LinearEncoding;
+                    homeUI.style.display = 'none';
+                    labHeader.style.display = '';
+                    markersLayer.style.display = pinsVisible ? 'block' : 'none';
+                    controls.enabled = true;
+                    camera.position.copy(defaultCamPos);
+                    camera.zoom = 1;
+                    camera.updateProjectionMatrix();
+                    controls.target.copy(defaultTarget);
+                    controls.update();
+                    resetCameraView();
+                    renderer.domElement.style.cursor = 'grab';
+                } else {
+                    renderer.outputEncoding = THREE.sRGBEncoding;
+                    drawerEl.classList.remove('open');
+                    hideTooltip();
+                    labHeader.style.display = 'none';
+                    markersLayer.style.display = 'none';
+                    homeUI.style.display = '';
+                    controls.enabled = false;
+                    renderer.domElement.style.cursor = 'default';
+                    homeClock.getDelta();
+                    if (homeModel) say(pick(HOME_LINES.greet));
+                }
+                stageFade.style.opacity = 0;
+                switching = false;
+            }, 520);
+        }
+        controls.enabled = false; // mulai di Home
+        document.getElementById('enter-lab-btn').addEventListener('click', () => goStage('lab'));
 
         // ============================================================================
         // 10. RESPONSIVE RESIZE & RENDER LOOP
@@ -1751,6 +2095,12 @@
         function animate() {
             requestAnimationFrame(animate);
             const elapsed = clock.getElapsedTime();
+
+            if (stage === 'home') {
+                updateHome(elapsed);
+                renderer.render(homeScene, homeCamera);
+                return;
+            }
 
             // 1. Animasi Detail Hidup di Dalam Laboratorium
             atomSpinner.rotation.y = elapsed * 0.85;
