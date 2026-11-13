@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agnes Tachyon — Dossier & Lab 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 45%, #0e3b48 0%, #061c24 55%, #020b10 100%);
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            position: relative;
+            z-index: 1;
+        }
+        .font-display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Layer Penanda Titik Info 3D */
+        #markers-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            overflow: hidden;
+        }
+
+        .info-pin {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            transform: translate(-50%, -50%);
+            border-radius: 9999px;
+            background: rgba(13, 148, 136, 0.85);
+            border: 2px solid rgba(204, 251, 241, 0.9);
+            box-shadow: 0 0 14px rgba(45, 212, 191, 0.85), inset 0 0 6px rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.25s ease, opacity 0.3s ease;
+        }
+        .info-pin::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 9999px;
+            border: 1.5px solid #5eead4;
+            animation: pulseRing 2.4s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+        }
+        .info-pin:hover, .info-pin.active-pin {
+            transform: translate(-50%, -50%) scale(1.25);
+            background: #14b8a6;
+            box-shadow: 0 0 22px rgba(94, 234, 212, 1);
+        }
+        .info-pin-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 9999px;
+            background-color: #ffffff;
+        }
+
+        @keyframes pulseRing {
+            0% { transform: scale(1); opacity: 0.9; }
+            75% { transform: scale(1.85); opacity: 0; }
+            100% { transform: scale(1.85); opacity: 0; }
+        }
+
+        /* Tooltip Melayang saat Hover */
+        #hover-tooltip {
+            position: fixed;
+            pointer-events: none;
+            z-index: 20;
+            transform: translate(-50%, -135%);
+            opacity: 0;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        #hover-tooltip.visible {
+            opacity: 1;
+            transform: translate(-50%, -150%);
+        }
+
+        /* Kartu Informasi Bawah (Glassmorphism) */
+        #info-drawer {
+            position: fixed;
+            bottom: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            max-width: 640px;
+            z-index: 30;
+            transition: bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+        #info-drawer.open {
+            bottom: 20px;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Scrollbar halus untuk teks lore panjang */
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(94, 234, 212, 0.35);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Kanvas 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Layer Titik Info 3D -->
+    <div id="markers-layer"></div>
+
+    <!-- Tooltip Hover -->
+    <div id="hover-tooltip" class="bg-slate-900/90 text-teal-100 border border-teal-400/40 px-3.5 py-1.5 rounded-xl shadow-xl backdrop-blur-md text-xs font-medium flex items-center gap-2 whitespace-nowrap">
+        <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+        <span id="tooltip-text">Objek Lab</span>
+    </div>
+
+    <!-- Header & Kontrol Atas -->
+    <header class="fixed top-0 left-0 w-full z-20 pointer-events-none px-4 pt-4 sm:px-6 sm:pt-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <!-- Judul Karakter -->
+        <div class="pointer-events-auto bg-slate-900/75 border border-teal-500/30 backdrop-blur-xl px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center text-slate-950 font-display font-bold text-lg shadow-inner">
+                ⚛
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-display text-sm sm:text-base font-bold tracking-wider text-white">
+                        AGNES TACHYON
+                    </h1>
+                    <span class="text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30">
+                        Dossier & Lab 3D
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-300/85 hidden sm:block">
+                    Klik perabotan atau titik berpendar untuk meneliti catatan eksperimen & profil karakter
+                </p>
+            </div>
+        </div>
+
+        <!-- Tombol Kontrol Navigasi -->
+        <div class="pointer-events-auto flex items-center gap-2">
+            <button id="toggle-pins-btn" class="bg-slate-900/75 hover:bg-slate-800/90 active:scale-95 text-teal-200 border border-teal-500/30 backdrop-blur-xl px-3.5 py-2 rounded-xl text-xs font-medium shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+                <span id="pin-status-dot" class="w-2 h-2 rounded-full bg-teal-400"></span>
+                <span>Titik Info</span>
+            </button>
+            <button id="reset-cam-btn" class="bg-teal-600/85 hover:bg-teal-500 active:scale-95 text-white border border-teal-300/40 backdrop-blur-xl px-3.5 py-2 rounded-xl text-xs font-semibold shadow-lg transition-all flex items-center gap-1.5 cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Reset Kamera</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Panel Kartu Informasi Bawah (Glassmorphism) -->
+    <section id="info-drawer" class="bg-slate-900/85 border border-teal-400/35 rounded-3xl shadow-2xl backdrop-blur-2xl overflow-hidden text-slate-100">
+        <div class="p-5 sm:p-6 relative">
+            <!-- Tombol Tutup -->
+            <button id="close-drawer-btn" aria-label="Tutup panel" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <div class="flex items-start gap-4">
+                <!-- Ikon Kategori -->
+                <div id="drawer-icon" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-teal-500/30 to-emerald-500/20 border border-teal-400/40 flex items-center justify-center text-2xl sm:text-3xl shrink-0 shadow-inner">
+                    🧪
+                </div>
+
+                <!-- Konten Lore -->
+                <div class="flex-1 min-w-0 pr-6">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <span id="drawer-tag" class="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 border border-teal-400/30">
+                            Arsip Subjek
+                        </span>
+                        <span id="drawer-counter" class="text-[11px] text-slate-400 font-mono">
+                            01 / 14
+                        </span>
+                    </div>
+                    <h2 id="drawer-title" class="font-display text-lg sm:text-xl font-bold text-white leading-snug mb-2">
+                        Judul Objek
+                    </h2>
+                    <p id="drawer-desc" class="text-xs sm:text-sm text-slate-200/90 leading-relaxed max-h-28 sm:max-h-32 overflow-y-auto custom-scroll pr-2">
+                        Deskripsi detail mengenai Agnes Tachyon.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Navigasi Antar Objek di Bawah Kartu -->
+            <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                <button id="prev-item-btn" class="text-teal-300 hover:text-white flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+                    <span>←</span>
+                    <span>Sebelumnya</span>
+                </button>
+                <span class="text-[11px] text-slate-400 hidden sm:inline">Agnes Tachyon — Akademi Tracen</span>
+                <button id="next-item-btn" class="text-teal-300 hover:text-white flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+                    <span>Berikutnya</span>
+                    <span>→</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ============================================================================
+        // 1. DATA LORE & PROFIL LENGKAP AGNES TACHYON (14 OBJEK LABORATORIUM)
+        // ============================================================================
+        const LORE_ITEMS = [
+            {
+                id: 'bookshelf',
+                tag: 'Intelektualitas & Teori',
+                icon: '📚',
+                title: 'Arsip Teori Kecepatan & Fisika',
+                desc: 'Rak gantung yang dipenuhi jurnal fisika kuantum, biomekanika, dan fisiologi olahraga. Agnes Tachyon adalah seorang jenius sejati di Akademi Tracen yang memandang balapan bukan sekadar olahraga, melainkan eksperimen ilmiah untuk membuktikan seberapa jauh batas kecepatan fisik makhluk hidup dapat ditembus.',
+                focusOffset: new THREE.Vector3(0, 0.4, 0)
+            },
+            {
+                id: 'firstaid',
+                tag: 'Kondisi Fisik & Risiko',
+                icon: '🩹',
+                title: 'Protokol Darurat Eksperimen',
+                desc: 'Kotak P3K dan saku arsip medis yang selalu disiagakan. Kaki Agnes Tachyon menyimpan potensi kecepatan luar biasa, namun sekaligus sangat rapuh karena beban gaya dorong yang melampaui batas biologis Umamusume. Kotak ini menjadi pengingat nyata atas risiko cedera kaki yang membayangi setiap akselerasi maksimalnya.',
+                focusOffset: new THREE.Vector3(0, 0.3, 0)
+            },
+            {
+                id: 'labcoat',
+                tag: 'Identitas & Penampilan',
+                icon: '🥼',
+                title: 'Jas Kebesaran Sang Ilmuwan Eksentrik',
+                desc: 'Jas lab putih kebesaran berlengan terlampau panjang yang menjadi ciri khas ikonik Agnes Tachyon. Ia nyaris tidak pernah melepaskannya di luar lintasan—bahkan saat berjalan santai di akademi—mencerminkan kepribadiannya yang eksentrik, teatrikal, namun tetap memiliki aura karismatik yang sulit diabaikan.',
+                focusOffset: new THREE.Vector3(0, 0.3, 0)
+            },
+            {
+                id: 'fridge',
+                tag: 'Rekor Tak Terkalahkan',
+                icon: '🏆',
+                title: 'Pendingin Sampel & Laporan Satsuki Sho',
+                desc: 'Kulkas dua pintu retro yang menyimpan reagen kimia sensitif suhu, dengan tumpukan laporan kemenangan Satsuki Sho di bagian atasnya. Di dunia balap, Tachyon mencatatkan sejarah fenomenal dengan menjuarai Satsuki Sho dalam rekor 4 balapan tak terkalahkan sebelum memutuskan mundur sementara demi riset evolusi.',
+                focusOffset: new THREE.Vector3(0, 0.5, 0)
+            },
+            {
+                id: 'counter',
+                tag: 'Eksperimen Tonik',
+                icon: '⚗️',
+                title: 'Stasiun Racik Ramuan Peningkat Performa',
+                desc: 'Meja utama tempat Tachyon meracik berbagai tonik, suplemen, dan minuman berenergi dengan rasa yang tak terbayangkan. Sebelum diuji coba sendiri, sang Trainer—yang ia juluki sebagai "Guinea Pig" (Kelinci Percobaan)—sering kali menjadi sasaran pertama untuk mencicipi ramuan-ramuan aneh dari stasiun ini.',
+                focusOffset: new THREE.Vector3(0, 0.3, 0)
+            },
+            {
+                id: 'hutch',
+                tag: 'Visi & Ambisi Besar',
+                icon: '🌐',
+                title: 'Peta Evolusi Spesies Umamusume',
+                desc: 'Rak hutch dengan lampu baca hangat dan miniatur globe dunia. Bagi Agnes Tachyon, kemenangan pribadi bukanlah tujuan akhir; ia ingin memicu revolusi ilmiah yang membawa seluruh spesies Umamusume menuju tahap evolusi berikutnya demi melampaui batasan kecepatan di seluruh penjuru dunia.',
+                focusOffset: new THREE.Vector3(0, 0.25, 0)
+            },
+            {
+                id: 'sink',
+                tag: 'Analisis Biokimia',
+                icon: '🔬',
+                title: 'Pengujian Metabolisme & Biokimia',
+                desc: 'Wastafel laboratorium dan baki kultur biologis untuk mengamati reaksi seluler serta pemulihan otot. Tachyon meneliti secara mendetail bagaimana metabolisme tubuh memproduksi energi ledakan (burst speed) dan bagaimana cara meredam kelelahan ekstrem pasca-sprint.',
+                focusOffset: new THREE.Vector3(0, 0.25, 0)
+            },
+            {
+                id: 'gloves',
+                tag: 'Metode Kerja',
+                icon: '🧤',
+                title: 'Alat Pelindung Eksperimen Berisiko',
+                desc: 'Sepasang sarung tangan karet oranye tebal dan kotak instrumen presisi. Meski sering tampak sembrono dan tertawa nyaring saat percobaannya meledak atau mengeluarkan asap warna-warni, Tachyon memiliki ketelitian tingkat tinggi ketika menangani senyawa reaktif yang berbahaya.',
+                focusOffset: new THREE.Vector3(0, 0.2, 0)
+            },
+            {
+                id: 'flask',
+                tag: 'Eliksir Ikonik',
+                icon: '🧪',
+                title: 'Eliksir Tachyon (Ramuan Bercahaya)',
+                desc: 'Labu Erlenmeyer berisi cairan hijau neon yang berpendar terang dalam gelap. Inilah simbol paling terkenal dari eksperimen Agnes Tachyon—ramuan misterius yang kerap memicu efek samping tak terduga, mulai dari tubuh yang bercahaya hingga reaksi jenaka pada sang Trainer maupun rekan sekamarnya, Manhattan Cafe.',
+                focusOffset: new THREE.Vector3(0, 0.25, 0)
+            },
+            {
+                id: 'board',
+                tag: 'Observasi & Rivalitas',
+                icon: '📋',
+                title: 'Papan Hipotesis & Data Lintasan',
+                desc: 'Papan pengumuman besar yang penuh dengan sketsa aerodinamika, grafik kecepatan sudut tikungan, dan catatan observasi. Di antara ribuan rumus tersebut terselip data pengamatan khusus mengenai rekan sekamar sekaligus rival terdekatnya, Manhattan Cafe, yang memiliki aura dan gaya lari misterius.',
+                focusOffset: new THREE.Vector3(0, 0.4, 0)
+            },
+            {
+                id: 'desk',
+                tag: 'Keseharian di Akademi',
+                icon: '💻',
+                title: 'Jurnal Penelitian & Simulasi Lintasan',
+                desc: 'Meja riset dusty-mauve yang tak pernah sepi dari buku catatan terbuka dan simulasi lintasan digital. Ketika tenggelam dalam hipotesis baru, Tachyon sering begadang berhari-hari dan lupa makan maupun merapikan diri, sehingga sang Trainer harus turun tangan mengurus kebutuhan dasarnya.',
+                focusOffset: new THREE.Vector3(0, 0.3, 0)
+            },
+            {
+                id: 'atom',
+                tag: 'Filosofi Nama',
+                icon: '⚛️',
+                title: 'Filosofi Partikel Tachyon',
+                desc: 'Model orbit atom 3D yang terus berputar di sudut meja. Nama "Tachyon" berasal dari partikel hipotetis dalam fisika teoretis yang selalu bergerak lebih cepat daripada kecepatan cahaya—sebuah filosofi yang mendefinisikan gaya lari eksplosifnya yang seolah menembus ruang dan waktu.',
+                focusOffset: new THREE.Vector3(0, 0.25, 0)
+            },
+            {
+                id: 'stool',
+                tag: 'Hubungan Trainer',
+                icon: '🪑',
+                title: 'Kursi Observasi "Guinea Pig"',
+                desc: 'Kursi stool bundar di tengah laboratorium yang selalu disiapkan khusus untuk sang Trainer. Bagi Agnes Tachyon, Trainer adalah "Guinea Pig" nomor satu—mitra tak tergantikan yang tidak hanya menjadi subjek uji coba, tetapi juga satu-satunya orang yang mampu memahami dan menopang ambisi gilanya.',
+                focusOffset: new THREE.Vector3(0, 0.25, 0)
+            },
+            {
+                id: 'plant',
+                tag: 'Keseimbangan Ruang',
+                icon: '🪴',
+                title: 'Penyeimbang Oksigen di Tengah Kekacauan Lab',
+                desc: 'Tanaman hias berdaun hijau cerah di dalam pot terakota di sudut ruangan. Di tengah bau bahan kimia, uap tabung reaksi, dan tumpukan kertas hipotesis yang berantakan, tanaman kecil ini menghadirkan sentuhan kehidupan alami yang menenangkan suasana laboratorium di Akademi Tracen.',
+                focusOffset: new THREE.Vector3(0, 0.3, 0)
+            }
+        ];
+
+        // ============================================================================
+        // 2. INISIALISASI SCENE, KAMERA ORTHOGRAPHIC ISOMETRIK & RENDERER
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const markersLayer = document.getElementById('markers-layer');
+        const scene = new THREE.Scene();
+
+        // Kamera Orthographic Isometrik
+        const frustumSize = 11.5;
+        let aspect = window.innerWidth / window.innerHeight;
+        const camera = new THREE.OrthographicCamera(
+            (frustumSize * aspect) / -2,
+            (frustumSize * aspect) / 2,
+            frustumSize / 2,
+            frustumSize / -2,
+            0.1,
+            100
+        );
+
+        const defaultCamPos = new THREE.Vector3(14, 12.2, 14);
+        const defaultTarget = new THREE.Vector3(0, 1.35, 0);
+        camera.position.copy(defaultCamPos);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.08;
+        container.appendChild(renderer.domElement);
+
+        // OrbitControls dengan Smooth Damping
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.copy(defaultTarget);
+        controls.minZoom = 0.65;
+        controls.maxZoom = 2.4;
+        controls.maxPolarAngle = Math.PI / 2 - 0.06;
+        controls.minPolarAngle = 0.25;
+        controls.update();
+
+        // State Animasi Fokus Kamera
+        let isCameraAnimating = false;
+        let desiredTarget = defaultTarget.clone();
+        let desiredZoom = 1.0;
+        let desiredCamPos = defaultCamPos.clone();
+
+        // ============================================================================
+        // 3. PENCAHAYAAN LABORATORIUM ISOMETRIK & PENDAR CYAN ALAS
+        // ============================================================================
+        const hemiLight = new THREE.HemisphereLight(0xdff9fb, 0x0b3948, 0.72);
+        hemiLight.position.set(0, 12, 0);
+        scene.add(hemiLight);
+
+        const mainLight = new THREE.DirectionalLight(0xfffcf2, 1.15);
+        mainLight.position.set(7.5, 13, 6.5);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 1;
+        mainLight.shadow.camera.far = 32;
+        const d = 8.5;
+        mainLight.shadow.camera.left = -d;
+        mainLight.shadow.camera.right = d;
+        mainLight.shadow.camera.top = d;
+        mainLight.shadow.camera.bottom = -d;
+        mainLight.shadow.bias = -0.0005;
+        scene.add(mainLight);
+
+        const rimLight = new THREE.DirectionalLight(0x5eead4, 0.45);
+        rimLight.position.set(-8, 7, -6);
+        scene.add(rimLight);
+
+        // Lampu titik hijau neon dari Labu Erlenmeyer
+        const flaskPointLight = new THREE.PointLight(0x76ff03, 1.2, 3.2);
+        flaskPointLight.position.set(-1.35, 1.55, -2.55);
+        scene.add(flaskPointLight);
+
+        // Lampu dinding bulat & persegi panjang
+        const wallBulbLight1 = new THREE.PointLight(0xe0f7fa, 0.65, 4.5);
+        wallBulbLight1.position.set(-2.5, 3.35, -0.35);
+        scene.add(wallBulbLight1);
+
+        const wallBulbLight2 = new THREE.PointLight(0xe0f7fa, 0.55, 4.5);
+        wallBulbLight2.position.set(-0.35, 2.95, 2.35);
+        scene.add(wallBulbLight2);
+
+        // ============================================================================
+        // 4. TEKS ARSITEKTURAL "AGNES TACHYON LAB" TERBAGI DI BELAKANG DINDING 3D
+        // ============================================================================
+        function createArchitecturalTextPlane(text, subText, width, height) {
+            const canvas = document.createElement('canvas');
+            const scale = 4;
+            canvas.width = width * 128 * scale;
+            canvas.height = height * 128 * scale;
+            const ctx = canvas.getContext('2d');
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Garis aksen teknis tipis di atas dan bawah
+            ctx.strokeStyle = 'rgba(94, 234, 212, 0.35)';
+            ctx.lineWidth = 3 * scale;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.06, canvas.height * 0.18);
+            ctx.lineTo(canvas.width * 0.94, canvas.height * 0.18);
+            ctx.stroke();
+
+            // Teks Utama Besar
+            ctx.save();
+            ctx.font = `800 ${54 * scale}px "Space Grotesk", "Inter", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Glow Cyan Halus
+            ctx.shadowColor = 'rgba(45, 212, 191, 0.55)';
+            ctx.shadowBlur = 18 * scale;
+            ctx.fillStyle = 'rgba(204, 251, 241, 0.92)';
+            ctx.fillText(text, canvas.width / 2, canvas.height * 0.52);
+            ctx.restore();
+
+            // Sub-label teknis kecil
+            if (subText) {
+                ctx.font = `600 ${15 * scale}px "Inter", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(94, 234, 212, 0.65)';
+                ctx.fillText(subText, canvas.width / 2, canvas.height * 0.82);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = 8;
+            const mat = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+
+            return new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+        }
+
+        const backdropGroup = new THREE.Group();
+        scene.add(backdropGroup);
+
+        // Dinding belakang kiri sejajar sumbu Z (x = -3.15), menghadap ke +X (arah kamera)
+        // Menampilkan "AGNES TACHYON" di atas dinding kiri
+        const leftWallTitle = createArchitecturalTextPlane(
+            'AGNES TACHYON',
+            'TRACEN ACADEMY // RESEARCH UNIT 01',
+            5.8,
+            1.25
+        );
+        leftWallTitle.rotation.y = Math.PI / 2;
+        leftWallTitle.position.set(-3.15, 4.65, 0.0);
+        backdropGroup.add(leftWallTitle);
+
+        // Dinding belakang kanan sejajar sumbu X (z = -3.15), menghadap ke +Z (arah kamera)
+        // Menampilkan "LABORATORY" / "LAB" terbagi simetris mengikuti dinding kanan
+        const rightWallTitle = createArchitecturalTextPlane(
+            'TACHYON LAB',
+            'SPEED EVOLUTION & BIO-DYNAMICS',
+            5.8,
+            1.25
+        );
+        rightWallTitle.position.set(0.0, 4.65, -3.15);
+        backdropGroup.add(rightWallTitle);
+
+        // ============================================================================
+        // 5. TEKSTUR PROSEDURAL (UBIN KERAMIK & PAPAN PENGUMUMAN)
+        // ============================================================================
+        function createTileTexture() {
+            const size = 1024;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Warna dasar teal mengilap
+            ctx.fillStyle = '#257c8a';
+            ctx.fillRect(0, 0, size, size);
+
+            const tiles = 10;
+            const step = size / tiles;
+
+            for (let r = 0; r < tiles; r++) {
+                for (let c = 0; c < tiles; c++) {
+                    // Variasi halus tiap ubin
+                    const shade = ((r + c) % 2 === 0) ? '#298695' : '#227583';
+                    ctx.fillStyle = shade;
+                    ctx.fillRect(c * step + 3, r * step + 3, step - 6, step - 6);
+
+                    // Kilau halus di sudut ubin
+                    const grad = ctx.createLinearGradient(c * step, r * step, (c + 1) * step, (r + 1) * step);
+                    grad.addColorStop(0, 'rgba(255,255,255,0.12)');
+                    grad.addColorStop(1, 'rgba(0,0,0,0.08)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(c * step + 3, r * step + 3, step - 6, step - 6);
+                }
+            }
+
+            // Garis nat keramik gelap
+            ctx.strokeStyle = '#113c44';
+            ctx.lineWidth = 4;
+            for (let i = 0; i <= tiles; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * step, 0);
+                ctx.lineTo(i * step, size);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * step);
+                ctx.lineTo(size, i * step);
+                ctx.stroke();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 8;
+            return tex;
+        }
+
+        function createWallTileTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1f6f7d';
+            ctx.fillRect(0, 0, 512, 256);
+
+            const cols = 10;
+            const rows = 4;
+            const cw = 512 / cols;
+            const rh = 256 / rows;
+
+            ctx.strokeStyle = '#103c44';
+            ctx.lineWidth = 3;
+            for (let r = 0; r <= rows; r++) {
+                ctx.beginPath();
+                ctx.moveTo(0, r * rh);
+                ctx.lineTo(512, r * rh);
+                ctx.stroke();
+            }
+            for (let c = 0; c <= cols; c++) {
+                ctx.beginPath();
+                ctx.moveTo(c * cw, 0);
+                ctx.lineTo(c * cw, 256);
+                ctx.stroke();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 4;
+            return tex;
+        }
+
+        function createPinboardTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            // Latar papan putih-abu bersih
+            ctx.fillStyle = '#e5ecee';
+            ctx.fillRect(0, 0, 1024, 512);
+
+            // Gambar sketsa rumus & kurva kecepatan samar di latar
+            ctx.strokeStyle = 'rgba(30, 90, 105, 0.25)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(80, 420);
+            ctx.bezierCurveTo(220, 120, 460, 380, 680, 90);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(320, 260, 85, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Tempelan catatan warna-warni (Pink, Teal, Putih, Kuning)
+            const notes = [
+                { x: 60, y: 55, w: 95, h: 110, c: '#f4b6c2', rot: -0.06, pin: '#e11d48' },
+                { x: 185, y: 70, w: 145, h: 165, c: '#f9d5dc', rot: 0.04, pin: '#0d9488' },
+                { x: 135, y: 265, w: 75, h: 75, c: '#2e8b9a', rot: -0.08, pin: '#fbbf24' },
+                { x: 255, y: 280, w: 80, h: 80, c: '#257a88', rot: 0.05, pin: '#f43f5e' },
+                { x: 375, y: 120, w: 110, h: 130, c: '#ffffff', rot: -0.04, pin: '#0284c7' },
+                { x: 525, y: 85, w: 165, h: 245, c: '#247886', rot: 0.07, pin: '#fde047' },
+                { x: 500, y: 235, w: 65, h: 75, c: '#f6a580', rot: -0.1, pin: '#ffffff' },
+                { x: 730, y: 75, w: 95, h: 95, c: '#ffffff', rot: 0.03, pin: '#ec4899' },
+                { x: 745, y: 210, w: 125, h: 115, c: '#f8d7df', rot: -0.05, pin: '#14b8a6' },
+                { x: 895, y: 125, w: 80, h: 105, c: '#ffffff', rot: 0.06, pin: '#f59e0b' },
+                { x: 875, y: 285, w: 95, h: 115, c: '#328f9e', rot: -0.04, pin: '#fb7185' }
+            ];
+
+            notes.forEach(n => {
+                ctx.save();
+                ctx.translate(n.x + n.w / 2, n.y + n.h / 2);
+                ctx.rotate(n.rot);
+
+                // Bayangan kertas
+                ctx.fillStyle = 'rgba(0,0,0,0.12)';
+                ctx.fillRect(-n.w / 2 + 4, -n.h / 2 + 6, n.w, n.h);
+
+                // Kertas
+                ctx.fillStyle = n.c;
+                ctx.fillRect(-n.w / 2, -n.h / 2, n.w, n.h);
+
+                // Garis tulisan simulasi
+                ctx.fillStyle = (n.c === '#247886' || n.c === '#2e8b9a' || n.c === '#328f9e')
+                    ? 'rgba(255,255,255,0.4)'
+                    : 'rgba(30,41,59,0.28)';
+                for (let l = 0; l < 4; l++) {
+                    ctx.fillRect(-n.w / 2 + 12, -n.h / 2 + 24 + l * 14, n.w * 0.65, 4);
+                }
+
+                // Pin warna
+                ctx.beginPath();
+                ctx.arc(0, -n.h / 2 + 10, 6, 0, Math.PI * 2);
+                ctx.fillStyle = n.pin;
+                ctx.fill();
+
+                ctx.restore();
+            });
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 8;
+            return tex;
+        }
+
+        // ============================================================================
+        // 6. MATERIAL UTAMA DIORAMA
+        // ============================================================================
+        const matFloorTile = new THREE.MeshStandardMaterial({
+            map: createTileTexture(),
+            roughness: 0.16,
+            metalness: 0.12
+        });
+        const matWallTile = new THREE.MeshStandardMaterial({
+            map: createWallTileTexture(),
+            roughness: 0.22,
+            metalness: 0.08
+        });
+        const matWallPlaster = new THREE.MeshStandardMaterial({
+            color: 0xf4f1ea,
+            roughness: 0.85
+        });
+        const matTealTrim = new THREE.MeshStandardMaterial({
+            color: 0x185c68,
+            roughness: 0.35
+        });
+        const matBaseDark = new THREE.MeshStandardMaterial({
+            color: 0x0f424c,
+            roughness: 0.45
+        });
+        const matCounterWhite = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc,
+            roughness: 0.35
+        });
+        const matCounterTeal = new THREE.MeshStandardMaterial({
+            color: 0x247886,
+            roughness: 0.35
+        });
+        const matMauve = new THREE.MeshStandardMaterial({
+            color: 0xc28592,
+            roughness: 0.55
+        });
+        const matDustyRose = new THREE.MeshStandardMaterial({
+            color: 0xb97c84,
+            roughness: 0.75
+        });
+        const matMetalSilver = new THREE.MeshStandardMaterial({
+            color: 0xdbe4e8,
+            roughness: 0.25,
+            metalness: 0.75
+        });
+        const matNeonGreen = new THREE.MeshStandardMaterial({
+            color: 0x76ff03,
+            emissive: 0x64dd17,
+            emissiveIntensity: 0.85,
+            roughness: 0.15
+        });
+        const matGlass = new THREE.MeshPhysicalMaterial({
+            color: 0xe0f7fa,
+            transparent: true,
+            opacity: 0.42,
+            roughness: 0.08,
+            metalness: 0.05
+        });
+        const matOrangeGlove = new THREE.MeshStandardMaterial({
+            color: 0xf97316,
+            roughness: 0.45
+        });
+        const matTerracotta = new THREE.MeshStandardMaterial({
+            color: 0xc26d53,
+            roughness: 0.75
+        });
+        const matPlantGreen = new THREE.MeshStandardMaterial({
+            color: 0x84cc16,
+            roughness: 0.55
+        });
+
+        // ============================================================================
+        // 7. MEMBANGUN ARSITEKTUR L-SHAPE & ALAS BERTINGKAT
+        // ============================================================================
+        const diorama = new THREE.Group();
+        scene.add(diorama);
+
+        // Alas Bertingkat (Plinth) + Pendar Cahaya Bawah
+        const plinthTop = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.28, 6.4), matTealTrim);
+        plinthTop.position.set(0, -0.14, 0);
+        plinthTop.receiveShadow = true;
+        diorama.add(plinthTop);
+
+        const plinthBottom = new THREE.Mesh(new THREE.BoxGeometry(6.15, 0.32, 6.15), matBaseDark);
+        plinthBottom.position.set(0, -0.44, 0);
+        diorama.add(plinthBottom);
+
+        // Pendaran cahaya cyan-teal lembut di bawah alas
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = 512;
+        glowCanvas.height = 512;
+        const gCtx = glowCanvas.getContext('2d');
+        const radGrad = gCtx.createRadialGradient(256, 256, 40, 256, 256, 250);
+        radGrad.addColorStop(0, 'rgba(45, 212, 191, 0.52)');
+        radGrad.addColorStop(0.55, 'rgba(20, 184, 166, 0.22)');
+        radGrad.addColorStop(1, 'rgba(6, 28, 36, 0)');
+        gCtx.fillStyle = radGrad;
+        gCtx.fillRect(0, 0, 512, 512);
+        const underGlowPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(11.5, 11.5),
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glowCanvas), transparent: true, depthWrite: false })
+        );
+        underGlowPlane.rotation.x = -Math.PI / 2;
+        underGlowPlane.position.y = -0.61;
+        diorama.add(underGlowPlane);
+
+        // Lantai Keramik 10x10 (6x6 unit)
+        const floorMesh = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.06, 6.0), matFloorTile);
+        floorMesh.position.set(0, 0.03, 0);
+        floorMesh.receiveShadow = true;
+        diorama.add(floorMesh);
+
+        // Dinding Kiri (sejajar sumbu Z, di x = -3.08)
+        const wallH = 3.85;
+        const tileH = 1.65;
+        const plasterH = wallH - tileH;
+
+        const leftWallLower = new THREE.Mesh(new THREE.BoxGeometry(0.16, tileH, 6.16), matWallTile);
+        leftWallLower.position.set(-3.08, tileH / 2, 0);
+        leftWallLower.receiveShadow = true;
+        leftWallLower.castShadow = true;
+        diorama.add(leftWallLower);
+
+        const leftWallUpper = new THREE.Mesh(new THREE.BoxGeometry(0.16, plasterH, 6.16), matWallPlaster);
+        leftWallUpper.position.set(-3.08, tileH + plasterH / 2, 0);
+        leftWallUpper.receiveShadow = true;
+        leftWallUpper.castShadow = true;
+        diorama.add(leftWallUpper);
+
+        // List bingkai dinding kiri
+        const leftWallTopTrim = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.09, 6.24), matTealTrim);
+        leftWallTopTrim.position.set(-3.08, wallH + 0.04, 0);
+        diorama.add(leftWallTopTrim);
+
+        const leftWallFrontTrim = new THREE.Mesh(new THREE.BoxGeometry(0.22, wallH + 0.08, 0.09), matTealTrim);
+        leftWallFrontTrim.position.set(-3.08, wallH / 2, 3.08);
+        diorama.add(leftWallFrontTrim);
+
+        // Dinding Kanan (sejajar sumbu X, di z = -3.08)
+        const rightWallLower = new THREE.Mesh(new THREE.BoxGeometry(6.16, tileH, 0.16), matWallTile);
+        rightWallLower.position.set(0, tileH / 2, -3.08);
+        rightWallLower.receiveShadow = true;
+        rightWallLower.castShadow = true;
+        diorama.add(rightWallLower);
+
+        const rightWallUpper = new THREE.Mesh(new THREE.BoxGeometry(6.16, plasterH, 0.16), matWallPlaster);
+        rightWallUpper.position.set(0, tileH + plasterH / 2, -3.08);
+        rightWallUpper.receiveShadow = true;
+        rightWallUpper.castShadow = true;
+        diorama.add(rightWallUpper);
+
+        // List bingkai dinding kanan & sudut tengah
+        const rightWallTopTrim = new THREE.Mesh(new THREE.BoxGeometry(6.24, 0.09, 0.22), matTealTrim);
+        rightWallTopTrim.position.set(0, wallH + 0.04, -3.08);
+        diorama.add(rightWallTopTrim);
+
+        const rightWallFrontTrim = new THREE.Mesh(new THREE.BoxGeometry(0.09, wallH + 0.08, 0.22), matTealTrim);
+        rightWallFrontTrim.position.set(3.08, wallH / 2, -3.08);
+        diorama.add(rightWallFrontTrim);
+
+        const cornerPillarTrim = new THREE.Mesh(new THREE.BoxGeometry(0.22, wallH + 0.08, 0.22), matTealTrim);
+        cornerPillarTrim.position.set(-3.08, wallH / 2, -3.08);
+        diorama.add(cornerPillarTrim);
+
+        // Lampu Dinding Dekoratif (Bulat & Persegi Panjang)
+        const roundLampFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 24), matTealTrim);
+        roundLampFrame.rotation.x = Math.PI / 2;
+        roundLampFrame.position.set(-2.35, 3.38, -2.99);
+        diorama.add(roundLampFrame);
+
+        const roundLampGlow = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.14, 0.07, 24),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        roundLampGlow.rotation.x = Math.PI / 2;
+        roundLampGlow.position.set(-2.35, 3.38, -2.98);
+        diorama.add(roundLampGlow);
+
+        const rectLampFrame = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.15, 0.07), matTealTrim);
+        rectLampFrame.position.set(2.45, 3.05, -2.99);
+        diorama.add(rectLampFrame);
+
+        const rectLampGlow = new THREE.Mesh(
+            new THREE.BoxGeometry(0.32, 0.1, 0.08),
+            new THREE.MeshBasicMaterial({ color: 0xe0f7fa })
+        );
+        rectLampGlow.position.set(2.45, 3.05, -2.98);
+        diorama.add(rectLampGlow);
+
+        // Sakelar Dinding Kecil
+        const switchBox = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.04), matCounterWhite);
+        switchBox.position.set(-2.72, 1.92, -2.99);
+        diorama.add(switchBox);
+
+        // ============================================================================
+        // 8. PEMBANGUNAN 14 PERABOTAN DETAIL & REGISTRASI INTERAKSI
+        // ============================================================================
+        const interactiveGroups = [];
+        const interactiveMeshes = [];
+        const pinElements = [];
+
+        function registerInteractiveObject(itemId, group, anchorPos) {
+            const loreData = LORE_ITEMS.find(item => item.id === itemId);
+            const index = LORE_ITEMS.findIndex(item => item.id === itemId);
+
+            // Kumpulkan semua mesh di dalam group untuk raycasting & hover highlight
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    child.userData.parentGroup = group;
+                    // Simpan material asli agar dapat disorot saat hover
+                    if (!child.userData.origEmissive) {
+                        child.userData.origEmissive = child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0x000000);
+                        child.userData.origEmissiveIntensity = child.material.emissiveIntensity || 0;
+                    }
+                    interactiveMeshes.push(child);
+                }
+            });
+
+            group.userData = {
+                id: itemId,
+                index,
+                lore: loreData,
+                anchorPos: anchorPos.clone()
+            };
+            interactiveGroups.push(group);
+
+            // Buat DOM Titik Info 3D
+            const pin = document.createElement('button');
+            pin.className = 'info-pin';
+            pin.setAttribute('aria-label', loreData.title);
+            pin.innerHTML = '<span class="info-pin-dot"></span>';
+            markersLayer.appendChild(pin);
+
+            pin.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectItemByIndex(index);
+            });
+            pin.addEventListener('mouseenter', () => {
+                showTooltip(loreData.title, pin);
+            });
+            pin.addEventListener('mouseleave', () => {
+                hideTooltip();
+            });
+
+            pinElements.push({
+                element: pin,
+                worldPos: anchorPos.clone(),
+                group
+            });
+        }
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 1: RAK BUKU GANTUNG ("bookshelf")
+        // ----------------------------------------------------------------------------
+        const bookshelfGroup = new THREE.Group();
+        bookshelfGroup.position.set(-2.82, 2.75, 1.35);
+        diorama.add(bookshelfGroup);
+
+        const shelfBack = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.85, 1.45), matTealTrim);
+        bookshelfGroup.add(shelfBack);
+
+        // Sekat rak atas, tengah, bawah & pembatas vertikal
+        [-0.4, 0, 0.4].forEach(y => {
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.04, 1.48), matCounterTeal);
+            plank.position.set(0.02, y, 0);
+            bookshelfGroup.add(plank);
+        });
+        [-0.72, 0, 0.72].forEach(z => {
+            const divider = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.85, 0.04), matCounterTeal);
+            divider.position.set(0.02, 0, z);
+            bookshelfGroup.add(divider);
+        });
+
+        // Deretan buku warna-warni di kedua tingkat
+        const bookColors = [0xf472b6, 0xfbbf24, 0x38bdf8, 0xa78bfa, 0xfb7185, 0x34d399, 0xf8fafc, 0xfb923c];
+        [0.18, -0.22].forEach((rowY, rIdx) => {
+            for (let b = 0; b < 16; b++) {
+                if (b === 7 || b === 8) continue; // ruang pembatas tengah
+                const bh = 0.26 + ((b + rIdx) % 3) * 0.03;
+                const book = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.24, bh, 0.065),
+                    new THREE.MeshStandardMaterial({ color: bookColors[(b + rIdx * 3) % bookColors.length], roughness: 0.6 })
+                );
+                book.position.set(0.04, rowY - (0.32 - bh) / 2, -0.62 + b * 0.082);
+                bookshelfGroup.add(book);
+            }
+        });
+        // Kertas catatan di atas rak
+        const topNote = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.02, 0.45), matCounterWhite);
+        topNote.position.set(0.03, 0.43, -0.2);
+        topNote.rotation.y = 0.15;
+        bookshelfGroup.add(topNote);
+
+        registerInteractiveObject('bookshelf', bookshelfGroup, new THREE.Vector3(-2.6, 3.25, 1.35));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 2: KOTAK P3K & SAKU ARSIP ("firstaid")
+        // ----------------------------------------------------------------------------
+        const firstAidGroup = new THREE.Group();
+        firstAidGroup.position.set(-2.95, 2.35, -0.42);
+        diorama.add(firstAidGroup);
+
+        // Kotak P3K Putih
+        const medBox = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.36, 0.32), matCounterWhite);
+        medBox.position.set(0, 0, -0.18);
+        firstAidGroup.add(medBox);
+
+        // Palang Medis Teal/Hijau
+        const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.18, 0.06), matCounterTeal);
+        crossV.position.set(0.075, 0, -0.18);
+        firstAidGroup.add(crossV);
+        const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.06, 0.18), matCounterTeal);
+        crossH.position.set(0.075, 0, -0.18);
+        firstAidGroup.add(crossH);
+
+        // Saku Arsip Dinding Teal di sebelahnya
+        const pocket1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.24, 0.22), matCounterTeal);
+        pocket1.position.set(-0.02, -0.04, 0.18);
+        firstAidGroup.add(pocket1);
+        const pocketPaper = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.17), matCounterWhite);
+        pocketPaper.position.set(0, 0.04, 0.18);
+        firstAidGroup.add(pocketPaper);
+
+        registerInteractiveObject('firstaid', firstAidGroup, new THREE.Vector3(-2.8, 2.65, -0.42));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 3: JAS LAB GANTUNG ("labcoat")
+        // ----------------------------------------------------------------------------
+        const labCoatGroup = new THREE.Group();
+        labCoatGroup.position.set(-2.88, 1.88, -1.15);
+        diorama.add(labCoatGroup);
+
+        // Gantungan dinding
+        const hook = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 12), matMetalSilver);
+        hook.rotation.z = Math.PI / 2;
+        hook.position.set(-0.06, 0.45, 0);
+        labCoatGroup.add(hook);
+
+        // Badan jas lab dusty-rose/putih berlipat
+        const coatTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.19, 0.88, 14), matDustyRose);
+        coatTorso.scale.set(0.65, 1, 1.15);
+        labCoatGroup.add(coatTorso);
+
+        const sleeveL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.72, 10), matDustyRose);
+        sleeveL.position.set(0.02, 0.04, -0.18);
+        sleeveL.rotation.x = 0.08;
+        labCoatGroup.add(sleeveL);
+
+        const sleeveR = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.72, 10), matDustyRose);
+        sleeveR.position.set(0.02, 0.04, 0.18);
+        sleeveR.rotation.x = -0.08;
+        labCoatGroup.add(sleeveR);
+
+        registerInteractiveObject('labcoat', labCoatGroup, new THREE.Vector3(-2.72, 2.45, -1.15));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 4: KULKAS DUA PINTU RETRO & TUMPUKAN LAPORAN ("fridge")
+        // ----------------------------------------------------------------------------
+        const fridgeGroup = new THREE.Group();
+        fridgeGroup.position.set(-2.35, 1.12, -2.25);
+        diorama.add(fridgeGroup);
+
+        // Badan Utama Kulkas
+        const fridgeBody = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.18, 1.05), matCounterWhite);
+        fridgeGroup.add(fridgeBody);
+
+        // Kisi ventilasi bawah warna teal
+        const fridgeVent = new THREE.Mesh(new THREE.BoxGeometry(1.07, 0.34, 1.07), matTealTrim);
+        fridgeVent.position.set(0, -0.92, 0);
+        fridgeGroup.add(fridgeVent);
+
+        // Pintu Freezer (Atas) & Pintu Utama (Bawah) menghadap +X
+        const doorTop = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.62, 0.98), matCounterWhite);
+        doorTop.position.set(0.54, 0.72, 0);
+        fridgeGroup.add(doorTop);
+
+        const doorBottom = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.12, 0.98), matCounterWhite);
+        doorBottom.position.set(0.54, -0.18, 0);
+        fridgeGroup.add(doorBottom);
+
+        // Gagang pintu & badge label teal
+        const handleTop = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.03), matTealTrim);
+        handleTop.position.set(0.58, 0.62, 0.38);
+        fridgeGroup.add(handleTop);
+
+        const handleBot = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.03), matTealTrim);
+        handleBot.position.set(0.58, 0.14, 0.38);
+        fridgeGroup.add(handleBot);
+
+        const badge = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.24), matCounterTeal);
+        badge.position.set(0.575, 0.85, -0.15);
+        fridgeGroup.add(badge);
+
+        // Tumpukan Kertas Laporan Satsuki Sho di atas kulkas
+        for (let p = 0; p < 4; p++) {
+            const sheet = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.015, 0.48), matCounterWhite);
+            sheet.position.set(0.05, 1.1 + p * 0.016, 0.04);
+            sheet.rotation.y = (p - 1.5) * 0.18;
+            fridgeGroup.add(sheet);
+        }
+
+        registerInteractiveObject('fridge', fridgeGroup, new THREE.Vector3(-2.1, 2.42, -2.25));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 5: MEJA COUNTER LAB & BOTOL KIMIA KOLONG ("counter")
+        // ----------------------------------------------------------------------------
+        const counterGroup = new THREE.Group();
+        counterGroup.position.set(-2.15, 0.48, 0.65);
+        diorama.add(counterGroup);
+
+        // Kabinet Bawah (dengan ruang kolong tengah untuk kaki & botol)
+        const cabLeft = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.88, 1.25), matCounterTeal);
+        cabLeft.position.set(0, 0, 1.15);
+        counterGroup.add(cabLeft);
+
+        const cabRight = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.88, 0.95), matCounterTeal);
+        cabRight.position.set(0, 0, -1.25);
+        counterGroup.add(cabRight);
+
+        // Laci bagian tengah atas
+        const cabMidDrawer = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.24, 1.35), matCounterTeal);
+        cabMidDrawer.position.set(0, 0.32, -0.1);
+        counterGroup.add(cabMidDrawer);
+
+        // Panel pintu & laci aksen putih
+        [-1.25, -0.1, 1.15].forEach((zPos, idx) => {
+            const drawerFace = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, idx === 1 ? 1.25 : 0.82), matCounterWhite);
+            drawerFace.position.set(0.53, 0.32, zPos);
+            counterGroup.add(drawerFace);
+        });
+
+        // Permukaan Meja Counter Putih Tebal
+        const counterTop = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.08, 3.65), matCounterWhite);
+        counterTop.position.set(0.03, 0.48, 0.02);
+        counterGroup.add(counterTop);
+
+        // Botol Kaca Besar di Kolong Bawah Meja
+        const jarGreen = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.16, 0.42, 18),
+            new THREE.MeshStandardMaterial({ color: 0x3f6212, transparent: true, opacity: 0.85, roughness: 0.15 })
+        );
+        jarGreen.position.set(0.15, -0.22, -0.35);
+        counterGroup.add(jarGreen);
+
+        const jarSmoke = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.14, 0.34, 18),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, transparent: true, opacity: 0.8, roughness: 0.15 })
+        );
+        jarSmoke.position.set(0.28, -0.26, 0.02);
+        counterGroup.add(jarSmoke);
+
+        registerInteractiveObject('counter', counterGroup, new THREE.Vector3(-1.75, 1.05, 0.25));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 6: RAK HUTCH, LAMPU MEJA & MINIATUR GLOBE ("hutch")
+        // ----------------------------------------------------------------------------
+        const hutchGroup = new THREE.Group();
+        hutchGroup.position.set(-2.45, 1.38, 0.55);
+        diorama.add(hutchGroup);
+
+        const hutchBack = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.78, 1.42), matCounterTeal);
+        hutchBack.position.set(-0.18, 0, 0);
+        hutchGroup.add(hutchBack);
+
+        [-0.36, 0.02, 0.38].forEach(y => {
+            const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.035, 1.45), matCounterWhite);
+            shelf.position.set(0, y, 0);
+            hutchGroup.add(shelf);
+        });
+        [-0.7, 0.02, 0.7].forEach(z => {
+            const side = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.76, 0.035), matCounterWhite);
+            side.position.set(0, 0, z);
+            hutchGroup.add(side);
+        });
+
+        // Buku-buku kecil & kotak pink di dalam hutch
+        const pinkBox = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.32), matMauve);
+        pinkBox.position.set(0.02, -0.25, 0.35);
+        hutchGroup.add(pinkBox);
+
+        for (let hb = 0; hb < 6; hb++) {
+            const hBook = new THREE.Mesh(
+                new THREE.BoxGeometry(0.22, 0.25, 0.06),
+                new THREE.MeshStandardMaterial({ color: bookColors[hb % bookColors.length] })
+            );
+            hBook.position.set(0.02, 0.18, -0.52 + hb * 0.075);
+            hutchGroup.add(hBook);
+        }
+
+        // Miniatur Globe di atas rak hutch
+        const globeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.04, 16), matTealTrim);
+        globeBase.position.set(0.04, 0.42, -0.35);
+        hutchGroup.add(globeBase);
+
+        const globeSphere = new THREE.Mesh(
+            new THREE.SphereGeometry(0.14, 20, 20),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35 })
+        );
+        globeSphere.position.set(0.04, 0.58, -0.35);
+        hutchGroup.add(globeSphere);
+
+        // Lampu Baca Mungil di atas hutch
+        const miniLampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.03, 14), matMetalSilver);
+        miniLampBase.position.set(0.05, 0.41, 0.45);
+        hutchGroup.add(miniLampBase);
+
+        const miniLampArm = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.26, 8), matMetalSilver);
+        miniLampArm.position.set(0.05, 0.53, 0.45);
+        miniLampArm.rotation.z = -0.25;
+        hutchGroup.add(miniLampArm);
+
+        const miniLampShade = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.12, 16), matCounterTeal);
+        miniLampShade.position.set(0.11, 0.64, 0.45);
+        miniLampShade.rotation.z = -0.7;
+        hutchGroup.add(miniLampShade);
+
+        registerInteractiveObject('hutch', hutchGroup, new THREE.Vector3(-2.35, 2.15, 0.55));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 7: WASTAFEL KERAN LEHER ANGSA & BAKI KULTUR LUMUT ("sink")
+        // ----------------------------------------------------------------------------
+        const sinkGroup = new THREE.Group();
+        sinkGroup.position.set(-1.95, 1.02, 1.72);
+        diorama.add(sinkGroup);
+
+        // Bak Wastafel
+        const sinkRim = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.05, 0.68), matCounterWhite);
+        sinkGroup.add(sinkRim);
+
+        const sinkBasin = new THREE.Mesh(
+            new THREE.BoxGeometry(0.46, 0.06, 0.56),
+            new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.25 })
+        );
+        sinkBasin.position.y = 0.005;
+        sinkGroup.add(sinkBasin);
+
+        // Keran Leher Angsa Teal
+        const faucetStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.28, 12), matCounterTeal);
+        faucetStem.position.set(-0.22, 0.16, 0);
+        sinkGroup.add(faucetStem);
+
+        const faucetArch = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.018, 10, 20, Math.PI), matCounterTeal);
+        faucetArch.position.set(-0.13, 0.3, 0);
+        sinkGroup.add(faucetArch);
+
+        // Ember Merah Kecil & Baki Kultur Lumut di sebelahnya
+        const redBucket = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.13, 0.1, 0.24, 16),
+            new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.45 })
+        );
+        redBucket.position.set(-0.08, 0.13, 0.52);
+        sinkGroup.add(redBucket);
+
+        const mossTray = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.46), matMetalSilver);
+        mossTray.position.set(0.02, 0.04, -0.62);
+        sinkGroup.add(mossTray);
+
+        const mossCulture = new THREE.Mesh(
+            new THREE.BoxGeometry(0.36, 0.05, 0.4),
+            new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.9 })
+        );
+        mossCulture.position.set(0.02, 0.055, -0.62);
+        sinkGroup.add(mossCulture);
+
+        registerInteractiveObject('sink', sinkGroup, new THREE.Vector3(-1.95, 1.48, 1.72));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 8: SARUNG TANGAN KARET ORANYE & KOTAK INSTRUMEN ("gloves")
+        // ----------------------------------------------------------------------------
+        const glovesGroup = new THREE.Group();
+        glovesGroup.position.set(-1.82, 1.02, 0.15);
+        diorama.add(glovesGroup);
+
+        // Kotak Kayu Instrumen Terbuka
+        const woodBoxBase = new THREE.Mesh(
+            new THREE.BoxGeometry(0.28, 0.08, 0.38),
+            new THREE.MeshStandardMaterial({ color: 0x9a5b32, roughness: 0.6 })
+        );
+        woodBoxBase.position.set(-0.05, 0.04, -0.18);
+        glovesGroup.add(woodBoxBase);
+
+        const woodBoxLid = new THREE.Mesh(
+            new THREE.BoxGeometry(0.26, 0.03, 0.38),
+            new THREE.MeshStandardMaterial({ color: 0xb46d3e, roughness: 0.6 })
+        );
+        woodBoxLid.position.set(-0.18, 0.16, -0.18);
+        woodBoxLid.rotation.z = 1.1;
+        glovesGroup.add(woodBoxLid);
+
+        // Sepasang Sarung Tangan Karet Oranye Berjari
+        function createRubberGlove(x, z, rotY) {
+            const g = new THREE.Group();
+            const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.025, 0.11), matOrangeGlove);
+            cuff.position.x = -0.07;
+            g.add(cuff);
+
+            const palm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.028, 0.1), matOrangeGlove);
+            palm.position.x = 0.04;
+            g.add(palm);
+
+            for (let f = 0; f < 4; f++) {
+                const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.011, 0.08, 8), matOrangeGlove);
+                finger.rotation.z = Math.PI / 2;
+                finger.position.set(0.12, 0, -0.036 + f * 0.024);
+                g.add(finger);
+            }
+            const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.012, 0.065, 8), matOrangeGlove);
+            thumb.rotation.z = Math.PI / 2;
+            thumb.rotation.y = 0.55;
+            thumb.position.set(0.07, 0, 0.06);
+            g.add(thumb);
+
+            g.position.set(x, 0.02, z);
+            g.rotation.y = rotY;
+            return g;
+        }
+
+        glovesGroup.add(createRubberGlove(0.18, 0.18, 0.25));
+        glovesGroup.add(createRubberGlove(0.15, -0.45, -0.35));
+
+        registerInteractiveObject('gloves', glovesGroup, new THREE.Vector3(-1.72, 1.32, 0.15));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 9: LABU ERLENMEYER CAIRAN HIJAU NEON ("flask")
+        // ----------------------------------------------------------------------------
+        const flaskGroup = new THREE.Group();
+        flaskGroup.position.set(-1.82, 1.02, -0.88);
+        diorama.add(flaskGroup);
+
+        // Labu Erlenmeyer Utama
+        const erlenmeyerCone = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.26, 24), matGlass);
+        erlenmeyerCone.position.set(0.08, 0.13, -0.1);
+        flaskGroup.add(erlenmeyerCone);
+
+        const erlenmeyerNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.14, 18), matGlass);
+        erlenmeyerNeck.position.set(0.08, 0.31, -0.1);
+        flaskGroup.add(erlenmeyerNeck);
+
+        // Cairan Hijau Neon Menyala di dalam Labu
+        const neonFluid = new THREE.Mesh(new THREE.ConeGeometry(0.135, 0.17, 24), matNeonGreen);
+        neonFluid.position.set(0.08, 0.09, -0.1);
+        flaskGroup.add(neonFluid);
+
+        // Labu Bulat Pendamping di sebelahnya
+        const roundFlask = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 20), matGlass);
+        roundFlask.position.set(-0.08, 0.11, 0.16);
+        flaskGroup.add(roundFlask);
+
+        const roundFlaskNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.14, 16), matGlass);
+        roundFlaskNeck.position.set(-0.08, 0.25, 0.16);
+        flaskGroup.add(roundFlaskNeck);
+
+        const cyanFluid = new THREE.Mesh(
+            new THREE.SphereGeometry(0.09, 18, 18),
+            new THREE.MeshStandardMaterial({ color: 0x2dd4bf, emissive: 0x14b8a6, emissiveIntensity: 0.5 })
+        );
+        cyanFluid.position.set(-0.08, 0.1, 0.16);
+        flaskGroup.add(cyanFluid);
+
+        registerInteractiveObject('flask', flaskGroup, new THREE.Vector3(-1.75, 1.52, -0.88));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 10: PAPAN PENGUMUMAN & DIAGRAM HIPOTESIS ("board")
+        // ----------------------------------------------------------------------------
+        const boardGroup = new THREE.Group();
+        boardGroup.position.set(0.55, 2.48, -2.96);
+        diorama.add(boardGroup);
+
+        const boardFrame = new THREE.Mesh(new THREE.BoxGeometry(3.15, 1.48, 0.07), matTealTrim);
+        boardGroup.add(boardFrame);
+
+        const boardSurface = new THREE.Mesh(
+            new THREE.BoxGeometry(2.98, 1.32, 0.08),
+            new THREE.MeshStandardMaterial({ map: createPinboardTexture(), roughness: 0.65 })
+        );
+        boardSurface.position.z = 0.01;
+        boardGroup.add(boardSurface);
+
+        registerInteractiveObject('board', boardGroup, new THREE.Vector3(0.55, 3.35, -2.8));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 11: MEJA RISET DUSTY-MAUVE, KURSI & MONITOR ("desk")
+        // ----------------------------------------------------------------------------
+        const deskGroup = new THREE.Group();
+        deskGroup.position.set(1.15, 0.55, -1.15);
+        diorama.add(deskGroup);
+
+        // Permukaan Meja Dusty-Mauve
+        const deskSurface = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.07, 1.05), matMauve);
+        deskSurface.position.y = 0.52;
+        deskGroup.add(deskSurface);
+
+        // Panel Samping & Belakang Putih dengan Roda
+        const deskSideL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.02, 0.98), matCounterWhite);
+        deskSideL.position.set(-0.68, 0, 0);
+        deskGroup.add(deskSideL);
+
+        const deskSideR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.02, 0.98), matCounterWhite);
+        deskSideR.position.set(0.68, 0, 0);
+        deskGroup.add(deskSideR);
+
+        const deskModesty = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.72, 0.05), matCounterWhite);
+        deskModesty.position.set(0, 0.12, 0.44);
+        deskGroup.add(deskModesty);
+
+        // Roda Meja
+        [[-0.65, -0.42], [0.65, -0.42], [-0.65, 0.42], [0.65, 0.42]].forEach(([wx, wz]) => {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.04, 12), matTealTrim);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(wx, -0.52, wz);
+            deskGroup.add(wheel);
+        });
+
+        // Monitor pada Lengan Artikulasi
+        const monitorArm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 12), matCounterWhite);
+        monitorArm.position.set(-0.48, 0.74, -0.32);
+        deskGroup.add(monitorArm);
+
+        const monitorBezel = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.48, 0.05), matDustyRose);
+        monitorBezel.position.set(-0.48, 0.96, -0.26);
+        monitorBezel.rotation.y = 0.35;
+        deskGroup.add(monitorBezel);
+
+        const monitorScreen = new THREE.Mesh(
+            new THREE.BoxGeometry(0.68, 0.4, 0.06),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0x0f172a, roughness: 0.2 })
+        );
+        monitorScreen.position.set(-0.48, 0.96, -0.255);
+        monitorScreen.rotation.y = 0.35;
+        deskGroup.add(monitorScreen);
+
+        // Buku Catatan Terbuka & Pensil Kuning di atas Meja
+        const openBookL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.025, 0.34), matCounterWhite);
+        openBookL.position.set(-0.18, 0.57, 0.08);
+        openBookL.rotation.z = -0.06;
+        deskGroup.add(openBookL);
+
+        const openBookR = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.025, 0.34), matCounterWhite);
+        openBookR.position.set(0.07, 0.57, 0.08);
+        openBookR.rotation.z = 0.06;
+        deskGroup.add(openBookR);
+
+        const pencil = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.012, 0.012, 0.24, 8),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15 })
+        );
+        pencil.rotation.z = Math.PI / 2;
+        pencil.rotation.y = 0.4;
+        pencil.position.set(-0.05, 0.57, 0.34);
+        deskGroup.add(pencil);
+
+        // Kursi Riset Dusty-Mauve di sisi meja
+        const chairGroup = new THREE.Group();
+        chairGroup.position.set(-0.88, -0.1, 0.12);
+        deskGroup.add(chairGroup);
+
+        const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.48), matMauve);
+        chairSeat.position.y = 0.12;
+        chairGroup.add(chairSeat);
+
+        const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.44), matMauve);
+        chairBack.position.set(-0.22, 0.38, 0);
+        chairBack.rotation.z = 0.14;
+        chairGroup.add(chairBack);
+
+        [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].forEach(([lx, lz]) => {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.56, 10), matMetalSilver);
+            leg.position.set(lx, -0.16, lz);
+            chairGroup.add(leg);
+        });
+
+        registerInteractiveObject('desk', deskGroup, new THREE.Vector3(1.15, 1.65, -1.15));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 12: MODEL ORBIT ATOM 3D ("atom")
+        // ----------------------------------------------------------------------------
+        const atomGroup = new THREE.Group();
+        atomGroup.position.set(1.56, 1.11, -1.05);
+        diorama.add(atomGroup);
+
+        const atomBase = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.04, 20), matMetalSilver);
+        atomGroup.add(atomBase);
+
+        const atomStand = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.24, 10), matMetalSilver);
+        atomStand.position.y = 0.12;
+        atomGroup.add(atomStand);
+
+        // Inti Atom & Cincin Elektron yang Berputar
+        const atomSpinner = new THREE.Group();
+        atomSpinner.position.y = 0.32;
+        atomGroup.add(atomSpinner);
+
+        const nucleus = new THREE.Mesh(
+            new THREE.SphereGeometry(0.055, 18, 18),
+            new THREE.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x0284c7, emissiveIntensity: 0.4 })
+        );
+        atomSpinner.add(nucleus);
+
+        const ringAngles = [
+            [0.45, 0.2, 0],
+            [-0.45, 0.8, 0.3],
+            [0.9, -0.4, 0.6]
+        ];
+        ringAngles.forEach(([rx, ry, rz], idx) => {
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.009, 10, 36), matCounterTeal);
+            ring.rotation.set(rx, ry, rz);
+            atomSpinner.add(ring);
+
+            const electron = new THREE.Mesh(
+                new THREE.SphereGeometry(0.022, 12, 12),
+                new THREE.MeshBasicMaterial({ color: idx === 0 ? 0x76ff03 : 0x38bdf8 })
+            );
+            electron.position.set(Math.cos(idx * 2) * 0.22, Math.sin(idx * 2) * 0.22, 0);
+            ring.add(electron);
+        });
+
+        registerInteractiveObject('atom', atomGroup, new THREE.Vector3(1.56, 1.68, -1.05));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 13: KURSI STOOL BUNDAR LAB DI TENGAH LANTAI ("stool")
+        // ----------------------------------------------------------------------------
+        const stoolGroup = new THREE.Group();
+        stoolGroup.position.set(0.15, 0.03, 0.85);
+        diorama.add(stoolGroup);
+
+        const stoolSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 28), matMauve);
+        stoolSeat.position.y = 0.66;
+        stoolGroup.add(stoolSeat);
+
+        const stoolSeatRim = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.015, 10, 28), matCounterWhite);
+        stoolSeatRim.rotation.x = Math.PI / 2;
+        stoolSeatRim.position.y = 0.66;
+        stoolGroup.add(stoolSeatRim);
+
+        // 4 Kaki Logam Stool & Cincin Pijakan Kaki
+        for (let s = 0; s < 4; s++) {
+            const angle = (s / 4) * Math.PI * 2 + Math.PI / 4;
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.016, 0.68, 12), matMetalSilver);
+            leg.position.set(Math.cos(angle) * 0.21, 0.33, Math.sin(angle) * 0.21);
+            leg.rotation.z = -Math.cos(angle) * 0.14;
+            leg.rotation.x = Math.sin(angle) * 0.14;
+            stoolGroup.add(leg);
+        }
+
+        const footRing = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 10, 28), matMetalSilver);
+        footRing.rotation.x = Math.PI / 2;
+        footRing.position.y = 0.24;
+        stoolGroup.add(footRing);
+
+        registerInteractiveObject('stool', stoolGroup, new THREE.Vector3(0.15, 0.92, 0.85));
+
+        // ----------------------------------------------------------------------------
+        // OBJEK 14: TANAMAN HIAS POT TERAKOTA ("plant")
+        // ----------------------------------------------------------------------------
+        const plantGroup = new THREE.Group();
+        plantGroup.position.set(2.38, 0.03, -2.25);
+        diorama.add(plantGroup);
+
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.36, 22), matTerracotta);
+        pot.position.y = 0.18;
+        plantGroup.add(pot);
+
+        const potRim = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.06, 22), matTerracotta);
+        potRim.position.y = 0.35;
+        plantGroup.add(potRim);
+
+        const soil = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.22, 0.22, 0.04, 18),
+            new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.95 })
+        );
+        soil.position.y = 0.36;
+        plantGroup.add(soil);
+
+        // Rumpun daun hijau cerah
+        for (let lf = 0; lf < 14; lf++) {
+            const a = (lf / 14) * Math.PI * 2;
+            const tilt = 0.35 + (lf % 3) * 0.22;
+            const leafH = 0.38 + (lf % 2) * 0.14;
+            const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.055, leafH, 6), matPlantGreen);
+            leaf.scale.set(1, 1, 0.25);
+            leaf.position.set(Math.cos(a) * 0.07, 0.38 + leafH * 0.42, Math.sin(a) * 0.07);
+            leaf.rotation.y = -a;
+            leaf.rotation.z = -tilt;
+            plantGroup.add(leaf);
+        }
+
+        registerInteractiveObject('plant', plantGroup, new THREE.Vector3(2.38, 1.05, -2.25));
+
+        // ============================================================================
+        // 9. INTERAKTIVITAS UI, HOVER GLOW, FOKUS KAMERA & DRAWER LORE
+        // ============================================================================
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        const tooltipEl = document.getElementById('hover-tooltip');
+        const tooltipText = document.getElementById('tooltip-text');
+        const drawerEl = document.getElementById('info-drawer');
+        const drawerIcon = document.getElementById('drawer-icon');
+        const drawerTag = document.getElementById('drawer-tag');
+        const drawerCounter = document.getElementById('drawer-counter');
+        const drawerTitle = document.getElementById('drawer-title');
+        const drawerDesc = document.getElementById('drawer-desc');
+
+        const closeDrawerBtn = document.getElementById('close-drawer-btn');
+        const prevItemBtn = document.getElementById('prev-item-btn');
+        const nextItemBtn = document.getElementById('next-item-btn');
+        const resetCamBtn = document.getElementById('reset-cam-btn');
+        const togglePinsBtn = document.getElementById('toggle-pins-btn');
+        const pinStatusDot = document.getElementById('pin-status-dot');
+
+        let hoveredGroup = null;
+        let selectedIndex = -1;
+        let pinsVisible = true;
+        let pointerDownPos = { x: 0, y: 0 };
+
+        function setGroupHighlight(group, active) {
+            if (!group) return;
+            group.traverse(child => {
+                if (child.isMesh && child.material && child.material.emissive) {
+                    if (active) {
+                        child.material.emissive.setHex(0x14b8a6);
+                        child.material.emissiveIntensity = Math.max(child.userData.origEmissiveIntensity, 0.35);
+                    } else {
+                        child.material.emissive.copy(child.userData.origEmissive);
+                        child.material.emissiveIntensity = child.userData.origEmissiveIntensity;
+                    }
+                }
+            });
+        }
+
+        function showTooltip(text, pinEl) {
+            tooltipText.textContent = text;
+            const rect = pinEl.getBoundingClientRect();
+            tooltipEl.style.left = `${rect.left + rect.width / 2}px`;
+            tooltipEl.style.top = `${rect.top}px`;
+            tooltipEl.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            tooltipEl.classList.remove('visible');
+        }
+
+        function selectItemByIndex(idx) {
+            selectedIndex = (idx + LORE_ITEMS.length) % LORE_ITEMS.length;
+            const group = interactiveGroups[selectedIndex];
+            const lore = group.userData.lore;
+
+            // Perbarui kartu drawer
+            drawerIcon.textContent = lore.icon;
+            drawerTag.textContent = lore.tag;
+            drawerCounter.textContent = `${String(selectedIndex + 1).padStart(2, '0')} / ${String(LORE_ITEMS.length).padStart(2, '0')}`;
+            drawerTitle.textContent = lore.title;
+            drawerDesc.textContent = lore.desc;
+            drawerEl.classList.add('open');
+
+            // Sorot pin aktif
+            pinElements.forEach((p, i) => {
+                p.element.classList.toggle('active-pin', i === selectedIndex);
+            });
+
+            // Fokuskan kamera ke objek di bagian atas-tengah layar agar tidak tertutup drawer bawah
+            const worldCenter = new THREE.Vector3();
+            new THREE.Box3().setFromObject(group).getCenter(worldCenter);
+            // Geser target sedikit ke bawah (-0.42 Y) sehingga objek tampil di area atas-tengah layar
+            desiredTarget.copy(worldCenter).add(new THREE.Vector3(0, -0.42, 0));
+            desiredZoom = 1.62;
+            isCameraAnimating = true;
+        }
+
+        function resetCameraView() {
+            selectedIndex = -1;
+            drawerEl.classList.remove('open');
+            pinElements.forEach(p => p.element.classList.remove('active-pin'));
+
+            desiredTarget.copy(defaultTarget);
+            desiredCamPos.copy(defaultCamPos);
+            desiredZoom = 1.0;
+            isCameraAnimating = true;
+        }
+
+        // Event Pointer Move untuk Hover Glow & Tooltip
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(interactiveMeshes, false);
+
+            if (hits.length > 0) {
+                const hitGroup = hits[0].object.userData.parentGroup;
+                if (hoveredGroup !== hitGroup) {
+                    setGroupHighlight(hoveredGroup, false);
+                    hoveredGroup = hitGroup;
+                    setGroupHighlight(hoveredGroup, true);
+                }
+                renderer.domElement.style.cursor = 'pointer';
+                tooltipText.textContent = hoveredGroup.userData.lore.title;
+                tooltipEl.style.left = `${e.clientX}px`;
+                tooltipEl.style.top = `${e.clientY}px`;
+                tooltipEl.classList.add('visible');
+            } else {
+                if (hoveredGroup) {
+                    setGroupHighlight(hoveredGroup, false);
+                    hoveredGroup = null;
+                }
+                renderer.domElement.style.cursor = 'grab';
+                hideTooltip();
+            }
+        });
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            pointerDownPos = { x: e.clientX, y: e.clientY };
+            // Hentikan animasi otomatis saat pengguna mulai menggeser kamera manual
+            isCameraAnimating = false;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            // Anggap sebagai klik murni jika pergeseran kursor < 6px
+            if (dist < 6 && hoveredGroup) {
+                selectItemByIndex(hoveredGroup.userData.index);
+            }
+        });
+
+        // Tombol Kontrol UI
+        closeDrawerBtn.addEventListener('click', () => {
+            drawerEl.classList.remove('open');
+            selectedIndex = -1;
+            pinElements.forEach(p => p.element.classList.remove('active-pin'));
+        });
+
+        prevItemBtn.addEventListener('click', () => {
+            selectItemByIndex(selectedIndex - 1);
+        });
+
+        nextItemBtn.addEventListener('click', () => {
+            selectItemByIndex(selectedIndex + 1);
+        });
+
+        resetCamBtn.addEventListener('click', resetCameraView);
+
+        togglePinsBtn.addEventListener('click', () => {
+            pinsVisible = !pinsVisible;
+            pinStatusDot.className = pinsVisible
+                ? 'w-2 h-2 rounded-full bg-teal-400'
+                : 'w-2 h-2 rounded-full bg-slate-500';
+            markersLayer.style.display = pinsVisible ? 'block' : 'none';
+        });
+
+        // ============================================================================
+        // 10. RESPONSIVE RESIZE & RENDER LOOP
+        // ============================================================================
+        window.addEventListener('resize', () => {
+            aspect = window.innerWidth / window.innerHeight;
+            camera.left = (frustumSize * aspect) / -2;
+            camera.right = (frustumSize * aspect) / 2;
+            camera.top = frustumSize / 2;
+            camera.bottom = frustumSize / -2;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            // 1. Animasi Detail Hidup di Dalam Laboratorium
+            atomSpinner.rotation.y = elapsed * 0.85;
+            atomSpinner.rotation.x = Math.sin(elapsed * 0.7) * 0.15;
+
+            const pulse = 0.75 + Math.sin(elapsed * 2.6) * 0.25;
+            matNeonGreen.emissiveIntensity = pulse;
+            flaskPointLight.intensity = 0.9 + Math.sin(elapsed * 2.6) * 0.35;
+
+            // 2. Transisi Halus Fokus Kamera & Zoom
+            if (isCameraAnimating) {
+                controls.target.lerp(desiredTarget, 0.065);
+                camera.zoom = THREE.MathUtils.lerp(camera.zoom, desiredZoom, 0.065);
+                if (selectedIndex === -1) {
+                    camera.position.lerp(desiredCamPos, 0.065);
+                }
+                camera.updateProjectionMatrix();
+
+                if (
+                    controls.target.distanceTo(desiredTarget) < 0.01 &&
+                    Math.abs(camera.zoom - desiredZoom) < 0.01
+                ) {
+                    isCameraAnimating = false;
+                }
+            }
+
+            controls.update();
+
+            // 3. Proyeksi Posisi Titik Info 3D ke Layar 2D
+            if (pinsVisible) {
+                pinElements.forEach((item) => {
+                    const projected = item.worldPos.clone().project(camera);
+                    const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (projected.y * -0.5 + 0.5) * window.innerHeight;
+                    item.element.style.left = `${x}px`;
+                    item.element.style.top = `${y}px`;
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            animate();
+        };
+    </script>
+</body>
+</html>
