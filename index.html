@@ -269,6 +269,7 @@
             <div class="max-w-md bg-slate-900/90 border border-amber-400/40 backdrop-blur-xl rounded-2xl px-5 py-4 text-xs text-amber-100 leading-relaxed">
                 <div class="font-semibold text-amber-300 mb-1">Model tachyon.glb gagal dimuat</div>
                 Pastikan file ada di <code class="text-white">models/tachyon.glb</code> (sejajar dengan index.html) dan halaman dibuka lewat server (Live Server, <code class="text-white">npx serve</code>, atau GitHub Pages), bukan klik dua kali (file://). Tombol lab tetap bisa dipakai.
+                <div id="home-error-detail" class="mt-2 pt-2 border-t border-amber-400/30 text-amber-50 font-medium">Memeriksa penyebab…</div>
             </div>
         </div>
     </div>
@@ -277,6 +278,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 
     <script>
         // ============================================================================
@@ -1893,8 +1895,38 @@
         const loadingEl = document.getElementById('home-loading');
         const progressEl = document.getElementById('home-progress');
 
-        new THREE.GLTFLoader().load(
-            MODEL_URL,
+        const MODEL_CANDIDATES = [MODEL_URL, 'Models/tachyon.glb', 'models/Tachyon.glb', 'tachyon.glb'];
+        const gltfLoader = new THREE.GLTFLoader();
+        if (THREE.DRACOLoader) {
+            const draco = new THREE.DRACOLoader();
+            draco.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+            gltfLoader.setDRACOLoader(draco);
+        }
+
+        async function diagnoseModel(err) {
+            const el = document.getElementById('home-error-detail');
+            let msg;
+            try {
+                const res = await fetch(MODEL_URL, { cache: 'no-store' });
+                if (!res.ok) {
+                    msg = 'Server menjawab HTTP ' + res.status + ' untuk "' + MODEL_URL + '". File tidak ditemukan: cek nama folder/file (huruf kecil semua) dan lokasinya di repo.';
+                } else {
+                    const buf = await res.arrayBuffer();
+                    const head = new TextDecoder().decode(buf.slice(0, 60));
+                    if (head.startsWith('version https://git-lfs')) msg = 'Yang tersaji hanya pointer Git LFS, bukan model asli. Upload ulang file GLB tanpa LFS.';
+                    else if (/^\s*</.test(head)) msg = 'Server mengembalikan halaman HTML, bukan GLB. Path salah atau halaman 404.';
+                    else if (head.slice(0, 4) !== 'glTF') msg = 'File bukan GLB valid (header bukan "glTF"). Ekspor ulang sebagai .glb (bukan .gltf/.fbx yang diganti nama).';
+                    else msg = 'File ditemukan (' + (buf.byteLength / 1048576).toFixed(1) + ' MB) tapi gagal diurai: ' + (err && err.message ? err.message : err);
+                }
+            } catch (e) {
+                msg = 'File tidak bisa diambil (' + e.message + '). Biasanya karena halaman dibuka lewat file:// , jalankan lewat server atau GitHub Pages.';
+            }
+            el.textContent = msg;
+        }
+
+        (function tryLoad(i) {
+        gltfLoader.load(
+            MODEL_CANDIDATES[i],
             (gltf) => {
                 homeModel = gltf.scene;
                 homeModel.traverse(o => {
@@ -1932,12 +1964,15 @@
             },
             (xhr) => { if (xhr.total) progressEl.textContent = Math.round(xhr.loaded / xhr.total * 100) + '%'; },
             (err) => {
-                console.error('Gagal memuat ' + MODEL_URL, err);
+                if (i + 1 < MODEL_CANDIDATES.length) return tryLoad(i + 1);
+                console.error('Gagal memuat model', err);
                 loadingEl.style.display = 'none';
                 document.getElementById('home-error').style.display = 'flex';
+                diagnoseModel(err);
                 say('Hmm, modelku belum ditemukan. Sementara itu, mari langsung ke laboratorium.');
             }
         );
+        })(0);
 
         // ---- Interaksi: tap (reaksi per area tubuh), geser (putar), scroll (zoom) ----
         const hRay = new THREE.Raycaster();
