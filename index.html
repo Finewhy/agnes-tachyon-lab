@@ -267,12 +267,12 @@
         </div>
         <div id="home-error" class="absolute inset-x-0 top-24 px-4 flex justify-center" style="display:none">
             <div class="max-w-md bg-slate-900/90 border border-amber-400/40 backdrop-blur-xl rounded-2xl px-5 py-4 text-xs text-amber-100 leading-relaxed">
-                <div class="font-semibold text-amber-300 mb-1">Model tachyon.glb gagal dimuat</div>
-                Pastikan file ada di <code class="text-white">models/tachyon.glb</code> (sejajar dengan index.html) dan halaman dibuka lewat server (Live Server, <code class="text-white">npx serve</code>, atau GitHub Pages), bukan klik dua kali (file://). Tombol lab tetap bisa dipakai.
+                <div id="home-error-title" class="font-semibold text-amber-300 mb-1">Model tachyon.glb gagal dimuat</div>
+                <span id="home-error-help">Pastikan file ada di <code class="text-white">models/tachyon.glb</code> (sejajar dengan index.html) dan halaman dibuka lewat server (Live Server, <code class="text-white">npx serve</code>, atau GitHub Pages), bukan klik dua kali (file://). Tombol lab tetap bisa dipakai.</span>
                 <div id="home-error-detail" class="mt-2 pt-2 border-t border-amber-400/30 text-amber-50 font-medium">Memeriksa penyebab…</div>
                 <div class="mt-3 flex items-center gap-3">
                     <button id="pick-glb-btn" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-3 py-1.5 rounded-lg cursor-pointer">Pilih tachyon.glb manual</button>
-                    <span class="text-[10px] opacity-60">build 3</span>
+                    <span class="text-[10px] opacity-60">build 4</span>
                 </div>
                 <input id="pick-glb-input" type="file" accept=".glb,.gltf,model/gltf-binary" style="display:none">
             </div>
@@ -1901,6 +1901,7 @@
         const progressEl = document.getElementById('home-progress');
 
         let manualPick = false;
+        let onModelLoaded;
         const MODEL_CANDIDATES = [MODEL_URL, 'Models/tachyon.glb', 'models/Tachyon.glb', 'tachyon.glb'];
         const gltfLoader = new THREE.GLTFLoader();
         if (THREE.DRACOLoader) {
@@ -1934,10 +1935,61 @@
             el.textContent = '[' + location.protocol + '//' + location.host + location.pathname + '] ' + msg;
         }
 
+
+        // ---- Pemulihan: GLB ditemukan tapi tekstur tidak bisa didecode browser ----
+        function parseGLB(buf, noBitmap) {
+            return new Promise((resolve) => {
+                const cib = window.createImageBitmap;
+                if (noBitmap) window.createImageBitmap = undefined; // paksa decoder <img> yang lebih toleran
+                const done = (v) => { window.createImageBitmap = cib; resolve(v); };
+                try { gltfLoader.parse(buf, '', (g) => done(g), () => done(null)); } catch (e) { done(null); }
+            });
+        }
+        function stripTexturesFromGLB(buf) {
+            const dv = new DataView(buf);
+            if (dv.getUint32(0, true) !== 0x46546C67 || dv.getUint32(16, true) !== 0x4E4F534A) return null;
+            const jsonLen = dv.getUint32(12, true);
+            const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+            const clean = (o) => {
+                if (o && typeof o === 'object') for (const k of Object.keys(o)) {
+                    if (/Texture$/.test(k)) delete o[k]; else clean(o[k]);
+                }
+            };
+            (json.materials || []).forEach(clean);
+            delete json.textures; delete json.images; delete json.samplers;
+            ['extensionsUsed', 'extensionsRequired'].forEach(k => { if (json[k]) json[k] = json[k].filter(x => !/texture/i.test(x)); });
+            const jb = new TextEncoder().encode(JSON.stringify(json));
+            const jpad = new Uint8Array(jb.length + (4 - jb.length % 4) % 4).fill(0x20);
+            jpad.set(jb);
+            const rest = new Uint8Array(buf, 20 + jsonLen);
+            const out = new Uint8Array(20 + jpad.length + rest.length);
+            const o = new DataView(out.buffer);
+            o.setUint32(0, 0x46546C67, true); o.setUint32(4, 2, true); o.setUint32(8, out.length, true);
+            o.setUint32(12, jpad.length, true); o.setUint32(16, 0x4E4F534A, true);
+            out.set(jpad, 20); out.set(rest, 20 + jpad.length);
+            return out.buffer;
+        }
+        async function recoverModel() {
+            let buf;
+            try {
+                const r = await fetch(manualPick ? MODEL_CANDIDATES[0] : MODEL_URL);
+                if (!r.ok) return null;
+                buf = await r.arrayBuffer();
+            } catch (e) { return null; }
+            let g = await parseGLB(buf.slice(0), true);
+            if (g) return { gltf: g, note: 'Dimuat dengan decoder gambar alternatif.' };
+            const stripped = stripTexturesFromGLB(buf);
+            if (stripped) {
+                g = await parseGLB(stripped, false);
+                if (g) return { gltf: g, note: 'Tekstur di dalam GLB tidak bisa didecode browser, jadi model tampil tanpa tekstur. Ekspor ulang teksturnya sebagai PNG/JPG/WebP atau optimalkan lewat gltf.report agar berwarna.' };
+            }
+            return null;
+        }
+
         function tryLoad(i) {
         gltfLoader.load(
             MODEL_CANDIDATES[i],
-            (gltf) => {
+            onModelLoaded = (gltf) => {
                 homeModel = gltf.scene;
                 homeModel.traverse(o => {
                     if (o.isMesh) {
@@ -1976,10 +2028,21 @@
             (err) => {
                 if (i + 1 < MODEL_CANDIDATES.length) return tryLoad(i + 1);
                 console.error('Gagal memuat model', err);
-                loadingEl.style.display = 'none';
-                document.getElementById('home-error').style.display = 'flex';
-                diagnoseModel(err);
-                say('Hmm, modelku belum ditemukan. Sementara itu, mari langsung ke laboratorium.');
+                recoverModel().then((res) => {
+                    if (res) {
+                        onModelLoaded(res.gltf);
+                        document.getElementById('home-error-title').textContent = 'Model dimuat dengan catatan';
+                        document.getElementById('home-error-help').style.display = 'none';
+                        document.getElementById('home-error-detail').textContent = res.note;
+                        document.getElementById('home-error').style.display = 'flex';
+                        setTimeout(() => { document.getElementById('home-error').style.display = 'none'; }, 15000);
+                        return;
+                    }
+                    loadingEl.style.display = 'none';
+                    document.getElementById('home-error').style.display = 'flex';
+                    diagnoseModel(err);
+                    say('Hmm, modelku belum bisa ditampilkan. Sementara itu, mari langsung ke laboratorium.');
+                });
             }
         );
         }
