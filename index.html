@@ -270,6 +270,11 @@
                 <div class="font-semibold text-amber-300 mb-1">Model tachyon.glb gagal dimuat</div>
                 Pastikan file ada di <code class="text-white">models/tachyon.glb</code> (sejajar dengan index.html) dan halaman dibuka lewat server (Live Server, <code class="text-white">npx serve</code>, atau GitHub Pages), bukan klik dua kali (file://). Tombol lab tetap bisa dipakai.
                 <div id="home-error-detail" class="mt-2 pt-2 border-t border-amber-400/30 text-amber-50 font-medium">Memeriksa penyebab…</div>
+                <div class="mt-3 flex items-center gap-3">
+                    <button id="pick-glb-btn" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-3 py-1.5 rounded-lg cursor-pointer">Pilih tachyon.glb manual</button>
+                    <span class="text-[10px] opacity-60">build 3</span>
+                </div>
+                <input id="pick-glb-input" type="file" accept=".glb,.gltf,model/gltf-binary" style="display:none">
             </div>
         </div>
     </div>
@@ -1895,6 +1900,7 @@
         const loadingEl = document.getElementById('home-loading');
         const progressEl = document.getElementById('home-progress');
 
+        let manualPick = false;
         const MODEL_CANDIDATES = [MODEL_URL, 'Models/tachyon.glb', 'models/Tachyon.glb', 'tachyon.glb'];
         const gltfLoader = new THREE.GLTFLoader();
         if (THREE.DRACOLoader) {
@@ -1906,6 +1912,10 @@
         async function diagnoseModel(err) {
             const el = document.getElementById('home-error-detail');
             let msg;
+            if (manualPick) {
+                el.textContent = 'File yang dipilih gagal diurai: ' + (err && err.message ? err.message : err);
+                return;
+            }
             try {
                 const res = await fetch(MODEL_URL, { cache: 'no-store' });
                 if (!res.ok) {
@@ -1921,10 +1931,10 @@
             } catch (e) {
                 msg = 'File tidak bisa diambil (' + e.message + '). Biasanya karena halaman dibuka lewat file:// , jalankan lewat server atau GitHub Pages.';
             }
-            el.textContent = msg;
+            el.textContent = '[' + location.protocol + '//' + location.host + location.pathname + '] ' + msg;
         }
 
-        (function tryLoad(i) {
+        function tryLoad(i) {
         gltfLoader.load(
             MODEL_CANDIDATES[i],
             (gltf) => {
@@ -1972,7 +1982,23 @@
                 say('Hmm, modelku belum ditemukan. Sementara itu, mari langsung ke laboratorium.');
             }
         );
-        })(0);
+        }
+        tryLoad(0);
+
+        // Fallback manual: pilih file dari komputer (jalan walau dibuka lewat file://)
+        const pickInput = document.getElementById('pick-glb-input');
+        document.getElementById('pick-glb-btn').addEventListener('click', () => pickInput.click());
+        pickInput.addEventListener('change', () => {
+            const f = pickInput.files[0];
+            if (!f) return;
+            manualPick = true;
+            MODEL_CANDIDATES.length = 0;
+            MODEL_CANDIDATES.push(URL.createObjectURL(f));
+            document.getElementById('home-error').style.display = 'none';
+            loadingEl.style.display = 'flex';
+            progressEl.textContent = '0%';
+            tryLoad(0);
+        });
 
         // ---- Interaksi: tap (reaksi per area tubuh), geser (putar), scroll (zoom) ----
         const hRay = new THREE.Raycaster();
